@@ -1,0 +1,295 @@
+// app/player.tsx
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  Pressable,
+  StyleSheet,
+  Dimensions,
+  ScrollView,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { usePlayer } from '../../context/PlayerContext.stub';
+import { useTheme } from '../../context/ThemeContext';
+import SeekBar from '../../components/SeekBar';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const ART_SIZE = Math.min(SCREEN_WIDTH - 64, 340);
+
+function formatTime(seconds: number) {
+  if (!seconds || isNaN(seconds)) return '0:00';
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+export default function PlayerScreen() {
+  const {
+    currentTrack,
+    isPlaying,
+    progress,
+    togglePlayPause,
+    next,
+    previous,
+    seekTo,
+  } = usePlayer();
+  const { colors } = useTheme();
+
+  const [seeking, setSeeking] = useState(false);
+  const [scrubPosition, setScrubPosition] = useState(0);
+
+  const displayPosition = seeking ? scrubPosition : progress.position;
+  const duration = currentTrack?.duration ?? progress.duration ?? 0;
+
+  const handleSeek = (seconds: number) => {
+    setSeekTo(seconds);
+  };
+
+  const setSeekTo = async (seconds: number) => {
+    setScrubPosition(seconds);
+    await seekTo(seconds);
+  };
+
+  const handleClose = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  };
+
+  return (
+    <SafeAreaView
+      style={[styles.root, { backgroundColor: colors.background }]}
+      edges={['top', 'bottom']}
+    >
+      {/* Header */}
+      <View style={styles.header}>
+        <Pressable onPress={handleClose} hitSlop={10} style={styles.headerBtn}>
+          <Feather name="chevron-down" size={26} color={colors.icon} />
+        </Pressable>
+        <View style={{ alignItems: 'center' }}>
+          <Text style={[styles.headerEyebrow, { color: colors.textMuted }]}>
+            NOW PLAYING
+          </Text>
+          <Text
+            style={[styles.headerTitle, { color: colors.text }]}
+            numberOfLines={1}
+          >
+            {currentTrack?.album || 'Library'}
+          </Text>
+        </View>
+        <Pressable hitSlop={10} style={styles.headerBtn}>
+          <Feather name="more-horizontal" size={24} color={colors.icon} />
+        </Pressable>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Album art */}
+        <View style={styles.artWrap}>
+          <View
+            style={[styles.art, { backgroundColor: colors.artPlaceholder }]}
+          >
+            <Feather name="music" size={72} color={colors.iconMuted} />
+          </View>
+        </View>
+
+        {/* Track info */}
+        <View style={styles.infoRow}>
+          <View style={{ flex: 1 }}>
+            <Text
+              numberOfLines={1}
+              style={[styles.title, { color: colors.text }]}
+            >
+              {currentTrack?.title || 'Nothing playing'}
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={[styles.artist, { color: colors.textSecondary }]}
+            >
+              {currentTrack?.artist || '—'}
+            </Text>
+          </View>
+          <Pressable hitSlop={8} style={styles.likeBtn}>
+            <Feather name="heart" size={22} color={colors.icon} />
+          </Pressable>
+        </View>
+
+        {/* Seek bar */}
+        <View style={styles.seekWrap}>
+          <SeekBar
+            position={displayPosition}
+            duration={duration}
+            onSeek={handleSeek}
+            onSeekingChange={setSeeking}
+          />
+          <View style={styles.timeRow}>
+            <Text style={[styles.timeText, { color: colors.textMuted }]}>
+              {formatTime(displayPosition)}
+            </Text>
+            <Text style={[styles.timeText, { color: colors.textMuted }]}>
+              {formatTime(duration)}
+            </Text>
+          </View>
+        </View>
+
+        {/* Controls */}
+        <View style={styles.controls}>
+          <Pressable hitSlop={10} style={styles.smallBtn}>
+            <Feather name="shuffle" size={22} color={colors.iconMuted} />
+          </Pressable>
+
+          <Pressable hitSlop={10} style={styles.smallBtn} onPress={previous}>
+            <Feather name="skip-back" size={30} color={colors.icon} />
+          </Pressable>
+
+          <Pressable
+            onPress={togglePlayPause}
+            style={[
+              styles.playBtn,
+              {
+                backgroundColor: colors.primary,
+                shadowColor: colors.fabShadow,
+              },
+            ]}
+            hitSlop={6}
+          >
+            <Feather
+              name={isPlaying ? 'pause' : 'play'}
+              size={34}
+              color={colors.primaryText}
+              style={{ marginLeft: isPlaying ? 0 : 3 }}
+            />
+          </Pressable>
+
+          <Pressable hitSlop={10} style={styles.smallBtn} onPress={next}>
+            <Feather name="skip-forward" size={30} color={colors.icon} />
+          </Pressable>
+
+          <Pressable hitSlop={10} style={styles.smallBtn}>
+            <Feather name="repeat" size={22} color={colors.iconMuted} />
+          </Pressable>
+        </View>
+
+        {/* Bottom row */}
+        <View
+          style={[styles.bottomRow, { borderTopColor: colors.border }]}
+        >
+          <Pressable hitSlop={8} style={styles.bottomBtn}>
+            <Feather name="speaker" size={20} color={colors.icon} />
+          </Pressable>
+          <Pressable hitSlop={8} style={styles.bottomBtn}>
+            <Feather name="list" size={20} color={colors.icon} />
+          </Pressable>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  headerBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerEyebrow: {
+    fontSize: 10,
+    letterSpacing: 1.5,
+    fontWeight: '700',
+  },
+  headerTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    maxWidth: 200,
+  },
+
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 32,
+  },
+
+  artWrap: {
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 32,
+  },
+  art: {
+    width: ART_SIZE,
+    height: ART_SIZE,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 8,
+  },
+
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  title: { fontSize: 22, fontWeight: '800' },
+  artist: { fontSize: 15, marginTop: 4 },
+  likeBtn: { padding: 8 },
+
+  seekWrap: { marginBottom: 8 },
+  timeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  timeText: { fontSize: 12, fontVariant: ['tabular-nums'] },
+
+  controls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 20,
+    marginBottom: 32,
+    paddingHorizontal: 8,
+  },
+  smallBtn: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playBtn: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
+
+  bottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  bottomBtn: {
+    padding: 12,
+  },
+});
