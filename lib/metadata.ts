@@ -13,9 +13,18 @@ export type TrackMetadata = {
   genre?: string;
 };
 
+export type NormalizedMetadata = {
+  title: string;
+  artist: string;
+  album: string;
+  artwork?: string;
+  trackNumber?: number;
+  year?: number;
+};
+
 const CACHE_DIR = FileSystem.documentDirectory + 'metadata-cache/';
 
-// Simple string hash → safe filename
+// ── Cache helpers ────────────────────────────────────────
 function hashUri(uri: string): string {
   let hash = 5381;
   for (let i = 0; i < uri.length; i++) {
@@ -35,35 +44,165 @@ async function ensureCacheDir(): Promise<void> {
   }
 }
 
-// ── Filename parser (fallback) ───────────────────────────
-// Handles: "01 - Artist - Title.mp3", "Artist - Title.mp3",
-//          "01 Title.mp3", "Title.mp3"
-export function parseFilename(filename: string): Partial<TrackMetadata> {
-  const base = filename.replace(/\.[^/.]+$/, '').trim();
+export async function getCached(uri: string): Promise<TrackMetadata | null> {
+  try {
+    const path = CACHE_DIR + hashUri(uri) + '.json';
+    const info = await FileSystem.getInfoAsync(path);
+    if (!info.exists) return null;
+    const raw = await FileSystem.readAsStringAsync(path);
+    return JSON.parse(raw) as TrackMetadata;
+  } catch {
+    return null;
+  }
+}
 
-  // "01 - Artist - Title"
-  let m = base.match(/^(\d{1,3})\s*[-.)]\s*(.+?)\s*[-–]\s*(.+)$/);
-  if (m) {
-    return {
-      trackNumber: parseInt(m[1], 10),
-      artist: m[2].trim(),
-      title: m[3].trim(),
-    };
+export async function setCached(
+  uri: string,
+  meta: TrackMetadata
+): Promise<void> {
+  try {
+    await ensureCacheDir();
+    const path = CACHE_DIR + hashUri(uri) + '.json';
+    await FileSystem.writeAsStringAsync(path, JSON.stringify(meta));
+  } catch {
+    // Storage full or unavailable — ignore
+  }
+}
+
+export async function clearCache(): Promise<void> {
+  try {
+    const info = await FileSystem.getInfoAsync(CACHE_DIR);
+    if (info.exists) {
+      await FileSystem.deleteAsync(CACHE_DIR, { idempotent: true });
+    }
+  } catch {
+    // ignore
+  }
+}
+
+// ── Filename normalization ──────────────────────────────
+
+// Bitrate / quality markers — anywhere in the string.
+//   (128k)  [320k]  (128kbps)  [256K]  (192 kbps)
+const BITRATE_RE = /\s*[\(\[]\s*\d{1,4}\s*k(?:bps)?\s*[\)\]]/gi;
+
+// Download-site / official-release artifacts. These are never part of
+// the song title. Version / remix / feat. markers are NOT here because
+// we want to keep those.
+const ARTIFACT_RES: RegExp[] = [
+  /\s*[\(\[]\s*official\s*(music\s*)?(audio|video|lyric[s]?\s*video)\s*[\)\]]/gi,
+  /\s*[\(\[]\s*official\s*[\)\]]/gi,
+  /\s*[\(\[]\s*(?:hd|hq|4k|8k)\s*[\)\]]/gi,
+  /\s*[\(\[]\s*(?:audio|video)\s*[\)\]]/gi,
+  /\s*[\(\[]\s*lyrics?\s*[\)\]]/gi,
+  /\s*[\(\[]\s*(?:www\.|https?:\/\/)[^\)\]]+[\)\]]/gi,
+  /\s*[\(\[]\s*[\w-]+\.(?:com|net|org|io|co\.za|za|xyz|mp3)[^\)\]]*[\)\]]/gi,
+];
+
+// Requires whitespace on both sides of the dash, so "Pro-Tee's" and
+// "Artist-Title" don't accidentally split.
+const ARTIST_SEP_RE = /^(.+?)\s+[-–—]\s+(.+)$/;
+
+// A candidate artist that is only digits / dashes is really a track
+// number, not an artist.
+const PURE_NUMBER_RE = /^[\d\s\-–—.]+$/;
+
+/**
+ * Turn a raw filename into something human-readable. Strips extension,
+ * underscores, bitrate markers, and download artifacts. Preserves
+ * version / remix / feat. markers.
+ */
+export function cleanFilename(filename: string): string {
+  let s = filename;
+
+  // 1. Strip file extension
+  s = s.replace(/\.[^/.]+$/, '');
+
+  // 2. Underscores → spaces
+  s = s.replace(/_/g, ' ');
+
+  // 3. Collapse whitespace
+  s = s.replace(/\s+/g, ' ').trim();
+
+  // 4. Strip bitrate markers
+  s = s.replace(BITRATE_RE, '');
+
+  // 5. Strip download-site / official-release artifacts
+  for (const re of ARTIFACT_RES) {
+    s = s.replace(re, '');
   }
 
-  // "Artist - Title"
-  m = base.match(/^(.+?)\s*[-–]\s*(.+)$/);
-  if (m) {
-    return { artist: m[1].trim(), title: m[2].trim() };
+  // 6. Final tidy — collapse whitespace and trim trailing junk
+  s = s.replace(/\s+/g, ' ').trim();
+  s = s.replace(/[\s\-–—._]+$/, '').trim();
+
+  return s;
+}
+
+/**
+ * Extract artist + title only when there's a clear "Artist - Title"
+ * pattern. Falls back to "Unknown Artist" otherwise.
+ */
+export function extractArtistAndTitle(cleaned: string): {
+  artist: string;
+  title: string;
+} {
+  const m = cleaned.match(ARTIST_SEP_RE);
+  if (!m) return { artist: 'Unknown Artist', title: cleaned };
+
+  const artist = m[1].trim();
+  const title = m[2].trim();
+
+  if (
+    artist.length < 2 ||
+    artist.length > 40 ||
+    PURE_NUMBER_RE.test(artist) ||
+    title.length < 1
+  ) {
+    return { artist: 'Unknown Artist', title: cleaned };
   }
 
-  // "01 Title"
-  m = base.match(/^(\d{1,3})\s*[-.)\s]\s*(.+)$/);
-  if (m) {
-    return { trackNumber: parseInt(m[1], 10), title: m[2].trim() };
-  }
+  return { artist, title };
+}
 
-  return { title: base };
+/**
+ * The single entry point for turning (filename, embedded-tags) into
+ * display metadata. Embedded tags always win when present; filename
+ * parsing fills the gaps.
+ */
+export function normalizeSongMetadata(
+  filename: string,
+  embedded: Partial<TrackMetadata> = {}
+): NormalizedMetadata {
+  const cleaned = cleanFilename(filename);
+  const fromFilename = extractArtistAndTitle(cleaned);
+
+  const hasEmbeddedTitle =
+    !!embedded.title && embedded.title.trim().length > 0;
+  const hasEmbeddedArtist =
+    !!embedded.artist && embedded.artist.trim().length > 0;
+
+  const title = hasEmbeddedTitle
+    ? embedded.title!.trim()
+    : fromFilename.title || cleaned || filename;
+
+  const artist = hasEmbeddedArtist
+    ? embedded.artist!.trim()
+    : fromFilename.artist;
+
+  const album =
+    embedded.album && embedded.album.trim().length > 0
+      ? embedded.album.trim()
+      : 'Unknown Album';
+
+  return {
+    title,
+    artist: artist || 'Unknown Artist',
+    album,
+    artwork: embedded.artwork,
+    trackNumber: embedded.trackNumber,
+    year: embedded.year,
+  };
 }
 
 // ── Read ID3 tags from a file URI ────────────────────────
@@ -102,57 +241,21 @@ export async function readTags(uri: string): Promise<Partial<TrackMetadata>> {
   }
 }
 
-// ── Cache (file-system based) ────────────────────────────
-export async function getCached(uri: string): Promise<TrackMetadata | null> {
-  try {
-    const path = CACHE_DIR + hashUri(uri) + '.json';
-    const info = await FileSystem.getInfoAsync(path);
-    if (!info.exists) return null;
-    const raw = await FileSystem.readAsStringAsync(path);
-    return JSON.parse(raw) as TrackMetadata;
-  } catch {
-    return null;
-  }
-}
-
-export async function setCached(
-  uri: string,
-  meta: TrackMetadata
-): Promise<void> {
-  try {
-    await ensureCacheDir();
-    const path = CACHE_DIR + hashUri(uri) + '.json';
-    await FileSystem.writeAsStringAsync(path, JSON.stringify(meta));
-  } catch {
-    // Storage full or unavailable — ignore
-  }
-}
-
-export async function clearCache(): Promise<void> {
-  try {
-    const info = await FileSystem.getInfoAsync(CACHE_DIR);
-    if (info.exists) {
-      await FileSystem.deleteAsync(CACHE_DIR, { idempotent: true });
-    }
-  } catch {
-    // ignore
-  }
-}
-
-// ── Merge: filename fallback + ID3 tags ─────────────────
+// ── Merge: embedded tags win, filename fills gaps ───────
+// Kept as a shim so existing callers (LibraryContext) don't change.
 export function mergeMetadata(
   filename: string,
   tags: Partial<TrackMetadata>
 ): TrackMetadata {
-  const fromName = parseFilename(filename);
-
+  const n = normalizeSongMetadata(filename, tags);
   return {
-    title: tags.title || fromName.title || filename,
-    artist: tags.artist || fromName.artist || 'Unknown Artist',
-    album: tags.album || 'Unknown Album',
-    artwork: tags.artwork,
-    trackNumber: tags.trackNumber ?? fromName.trackNumber,
-    year: tags.year,
+    title: n.title,
+    artist: n.artist,
+    album: n.album,
+    artwork: n.artwork,
+    trackNumber: n.trackNumber,
+    year: n.year,
+    genre: tags.genre,
   };
 }
 
@@ -200,9 +303,12 @@ export function groupByAlbum(songs: Song[]): Album[] {
     );
   }
 
-  return Array.from(map.values()).sort((a, b) =>
-    a.title.localeCompare(b.title)
-  );
+  return Array.from(map.values()).sort((a, b) => {
+    // Push the unknown bucket to the very bottom.
+    if (a.key === '__unknown__') return 1;
+    if (b.key === '__unknown__') return -1;
+    return a.title.localeCompare(b.title);
+  });
 }
 
 // ── Artist grouping ──────────────────────────────────────
