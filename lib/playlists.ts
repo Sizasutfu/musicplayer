@@ -4,7 +4,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 export type Playlist = {
   id: string;
   name: string;
-  trackUris: string[];   // ordered list of Song.url values
+  trackUris: string[];
   createdAt: number;
   updatedAt: number;
 };

@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { PlayerProvider } from '../context/PlayerContext.stub';
 import { ThemeProvider, useTheme } from '../context/ThemeContext';
+import { PlaylistsProvider } from '../context/PlaylistsContext';
 
 function ThemedStack() {
   const { colors, isDark } = useTheme();
@@ -48,9 +49,11 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ThemeProvider>
-          <PlayerProvider>
-            <ThemedStack />
-          </PlayerProvider>
+          <PlaylistsProvider>
+            <PlayerProvider>
+              <ThemedStack />
+            </PlayerProvider>
+          </PlaylistsProvider>
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
