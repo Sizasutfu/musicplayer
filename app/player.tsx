@@ -14,6 +14,7 @@ import { router } from 'expo-router';
 import { usePlayer } from '../context/PlayerContext.stub';
 import { useTheme } from '../context/ThemeContext';
 import SeekBar from '../components/SeekBar';
+import LikeButton from '../components/LikeButton';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ART_SIZE = Math.min(SCREEN_WIDTH - 64, 340);
@@ -62,6 +63,7 @@ export default function PlayerScreen() {
       style={[styles.root, { backgroundColor: colors.background }]}
       edges={['top', 'bottom']}
     >
+      {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={handleClose} hitSlop={10} style={styles.headerBtn}>
           <Feather name="chevron-down" size={26} color={colors.icon} />
@@ -98,6 +100,7 @@ export default function PlayerScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Album art */}
         <View style={styles.artWrap}>
           <View
             style={[
@@ -112,6 +115,7 @@ export default function PlayerScreen() {
           </View>
         </View>
 
+        {/* Track info + heart */}
         <View style={styles.infoRow}>
           <View style={{ flex: 1 }}>
             <Text
@@ -130,11 +134,15 @@ export default function PlayerScreen() {
               {currentTrack?.artist || '—'}
             </Text>
           </View>
-          <Pressable hitSlop={8} style={styles.likeBtn}>
-            <Feather name="heart" size={22} color={colors.icon} />
-          </Pressable>
+
+          {currentTrack ? (
+            <LikeButton uri={currentTrack.url} size={26} hitSlop={10} />
+          ) : (
+            <View style={styles.likePlaceholder} />
+          )}
         </View>
 
+        {/* Seek bar */}
         <View style={styles.seekWrap}>
           <SeekBar
             position={displayPosition}
@@ -168,6 +176,7 @@ export default function PlayerScreen() {
           </View>
         </View>
 
+        {/* Transport controls */}
         <View style={styles.controls}>
           <Pressable hitSlop={10} style={styles.smallBtn}>
             <Feather name="shuffle" size={22} color={colors.iconMuted} />
@@ -205,9 +214,8 @@ export default function PlayerScreen() {
           </Pressable>
         </View>
 
-        <View
-          style={[styles.bottomRow, { borderTopColor: colors.border }]}
-        >
+        {/* Bottom row */}
+        <View style={[styles.bottomRow, { borderTopColor: colors.border }]}>
           <Pressable hitSlop={8} style={styles.bottomBtn}>
             <Feather name="speaker" size={20} color={colors.icon} />
           </Pressable>
@@ -264,8 +272,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 24,
+    gap: 12,
   },
-  likeBtn: { padding: 8 },
+  likePlaceholder: { width: 26, height: 26 },
 
   seekWrap: { marginBottom: 8 },
   timeRow: {

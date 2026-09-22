@@ -7,6 +7,7 @@ import { PlayerProvider } from '../context/PlayerContext.stub';
 import { ThemeProvider, useTheme } from '../context/ThemeContext';
 import { PlaylistsProvider } from '../context/PlaylistsContext';
 import { LibraryProvider } from '../context/LibraryContext';
+import { FavoritesProvider } from '../context/FavoritesContext';
 
 function ThemedStack() {
   const { colors, isDark } = useTheme();
@@ -52,9 +53,11 @@ export default function RootLayout() {
         <ThemeProvider>
           <LibraryProvider>
             <PlaylistsProvider>
-              <PlayerProvider>
-                <ThemedStack />
-              </PlayerProvider>
+              <FavoritesProvider>
+                <PlayerProvider>
+                  <ThemedStack />
+                </PlayerProvider>
+              </FavoritesProvider>
             </PlaylistsProvider>
           </LibraryProvider>
         </ThemeProvider>

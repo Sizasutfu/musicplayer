@@ -7,12 +7,24 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePlayer } from '../context/PlayerContext.stub';
 import { useTheme } from '../context/ThemeContext';
 
-export default function MiniPlayer() {
+type Props = {
+  /**
+   * Extra space below the mini player. Inside a tab navigator, pass the
+   * tab bar height + 12. Outside tabs, leave undefined so the OS
+   * gesture bar is accounted for automatically.
+   */
+  bottomOffset?: number;
+};
+
+export default function MiniPlayer({ bottomOffset }: Props) {
   const { currentTrack, isPlaying, togglePlayPause, next } = usePlayer();
   const { colors, design } = useTheme();
   const insets = useSafeAreaInsets();
 
   if (!currentTrack) return null;
+
+  const bottom =
+    bottomOffset !== undefined ? bottomOffset : insets.bottom + 12;
 
   return (
     <Pressable
@@ -21,7 +33,7 @@ export default function MiniPlayer() {
         {
           backgroundColor: colors.miniPlayerBg,
           borderRadius: design.radius.card,
-          bottom: insets.bottom + 12,
+          bottom,
         },
       ]}
       onPress={() => router.push('/player')}
