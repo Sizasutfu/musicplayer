@@ -160,7 +160,7 @@ export function mergeMetadata(
 import type { Song } from '../hooks/useLibrary';
 
 export type Album = {
-  key: string;          // `${artist}::${album}`
+  key: string;          // `${artist}::${album}` or `__unknown__`
   title: string;
   artist: string;
   artwork?: string;
@@ -171,13 +171,20 @@ export function groupByAlbum(songs: Song[]): Album[] {
   const map = new Map<string, Album>();
 
   for (const s of songs) {
-    const key = `${s.artist}::${s.album}`;
+    const isUnknownAlbum = !s.album || s.album === 'Unknown Album';
+
+    // Unknown albums all share one bucket so they don't fragment
+    // into one tile per filename-derived artist.
+    const key = isUnknownAlbum
+      ? '__unknown__'
+      : `${s.artist}::${s.album}`;
+
     let entry = map.get(key);
     if (!entry) {
       entry = {
         key,
-        title: s.album,
-        artist: s.artist,
+        title: isUnknownAlbum ? 'Unknown Album' : s.album,
+        artist: isUnknownAlbum ? 'Various Artists' : s.artist,
         artwork: s.artwork,
         songs: [],
       };
@@ -230,9 +237,10 @@ export function groupByArtist(songs: Song[]): Artist[] {
     if (!entry.artwork && s.artwork) entry.artwork = s.artwork;
   }
 
-  // Attach albums to each artist
+  // Attach albums to each artist, skipping the merged unknown bucket
   const allAlbums = groupByAlbum(songs);
   for (const album of allAlbums) {
+    if (album.key === '__unknown__') continue;
     const artist = map.get(album.artist);
     if (artist) artist.albums.push(album);
   }
