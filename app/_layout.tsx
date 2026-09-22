@@ -1,4 +1,12 @@
 // app/_layout.tsx
+import { LogBox } from 'react-native';
+
+// Silence the deprecation warning from a dependency still using the
+// old expo-file-system API. Remove once the dependency is updated.
+LogBox.ignoreLogs([
+  'Method getInfoAsync imported from "expo-file-system" is deprecated',
+]);
+
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
