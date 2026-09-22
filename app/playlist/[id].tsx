@@ -12,6 +12,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -33,7 +34,7 @@ function formatDuration(seconds?: number) {
 export default function PlaylistDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { playlists, remove, rename, removeTrack } = usePlaylists();
-  const { songs } = useLibrary();
+  const { songs, loading: libraryLoading } = useLibrary();
   const { playQueue, currentTrack, isPlaying } = usePlayer();
   const { colors } = useTheme();
 
@@ -275,15 +276,21 @@ export default function PlaylistDetailScreen() {
           );
         }}
         ListEmptyComponent={
-          <View style={styles.emptyWrap}>
-            <Feather name="music" size={36} color={colors.iconMuted} />
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>
-              Empty playlist
-            </Text>
-            <Text style={[styles.mutedText, { color: colors.textSecondary }]}>
-              Long-press a song in your library to add it here.
-            </Text>
-          </View>
+          libraryLoading ? (
+            <View style={styles.emptyWrap}>
+              <ActivityIndicator color={colors.primary} />
+            </View>
+          ) : (
+            <View style={styles.emptyWrap}>
+              <Feather name="music" size={36} color={colors.iconMuted} />
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>
+                Empty playlist
+              </Text>
+              <Text style={[styles.mutedText, { color: colors.textSecondary }]}>
+                Long-press a song in your library to add it here.
+              </Text>
+            </View>
+          )
         }
       />
 
