@@ -3,12 +3,11 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import {
-  DrawerContentScrollView,
-  type DrawerContentComponentProps,
-} from '@react-navigation/drawer';
+import { type DrawerContentComponentProps } from '@react-navigation/drawer';
 import { router } from 'expo-router';
 import { useTheme } from '../context/ThemeContext';
+import { useProfile } from '../hooks/useProfile';
+import ProfileAvatar from './ProfileAvatar';
 
 const NAV_ITEMS = [
   { name: 'index', label: 'Library', icon: 'music' as const, route: '/' },
@@ -22,24 +21,54 @@ export default function CustomDrawerContent(
   props: DrawerContentComponentProps
 ) {
   const { colors } = useTheme();
+  const { profile } = useProfile();
   const activeRoute = props.state.routeNames[props.state.index];
+
+  const goToProfile = () => {
+    router.push('/profile');
+    props.navigation.closeDrawer();
+  };
 
   return (
     <SafeAreaView
       style={[styles.root, { backgroundColor: colors.surface }]}
       edges={['top', 'bottom']}
     >
-      <View style={styles.header}>
-        <View style={[styles.logo, { backgroundColor: colors.primary }]}>
-          <Feather name="headphones" size={22} color={colors.primaryText} />
-        </View>
-        <View>
-          <Text style={[styles.brand, { color: colors.text }]}>MusicPlayer</Text>
-          <Text style={[styles.tagline, { color: colors.textMuted }]}>
-            Your offline library
+      {/* ── Profile header ──────────────────────────── */}
+      <Pressable
+        onPress={goToProfile}
+        style={({ pressed }) => [
+          styles.profileHeader,
+          pressed && { opacity: 0.7 },
+        ]}
+      >
+        <ProfileAvatar
+          name={profile.name}
+          color={profile.avatarColor}
+          size={52}
+        />
+        <View style={{ flex: 1 }}>
+          <Text
+            numberOfLines={1}
+            style={[styles.profileName, { color: colors.text }]}
+          >
+            {profile.name}
+          </Text>
+          <Text
+            numberOfLines={1}
+            style={[styles.profileUsername, { color: colors.textMuted }]}
+          >
+            @{profile.username}
           </Text>
         </View>
-      </View>
+        <Feather
+          name="chevron-right"
+          size={20}
+          color={colors.textMuted}
+        />
+      </Pressable>
+
+      <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
       <ScrollView
         style={styles.scroll}
@@ -51,7 +80,10 @@ export default function CustomDrawerContent(
           return (
             <Pressable
               key={item.name}
-              onPress={() => router.push(item.route as any)}
+              onPress={() => {
+                router.push(item.route as any);
+                props.navigation.closeDrawer();
+              }}
               style={({ pressed }) => [
                 styles.row,
                 active && { backgroundColor: colors.rowActive },
@@ -90,10 +122,15 @@ export default function CustomDrawerContent(
         {['Recently Added', 'Favorites', 'Downloaded'].map((name) => (
           <Pressable
             key={name}
-            style={({ pressed }) => [styles.playlistRow, pressed && { opacity: 0.6 }]}
+            style={({ pressed }) => [
+              styles.playlistRow,
+              pressed && { opacity: 0.6 },
+            ]}
           >
             <Feather name="folder" size={16} color={colors.iconMuted} />
-            <Text style={[styles.playlistLabel, { color: colors.textSecondary }]}>
+            <Text
+              style={[styles.playlistLabel, { color: colors.textSecondary }]}
+            >
               {name}
             </Text>
           </Pressable>
@@ -111,23 +148,17 @@ export default function CustomDrawerContent(
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  header: {
+
+  profileHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 20,
+    paddingTop: 12,
+    paddingBottom: 16,
   },
-  logo: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  brand: { fontSize: 17, fontWeight: '800' },
-  tagline: { fontSize: 12, marginTop: 1 },
+  profileName: { fontSize: 16, fontWeight: '700' },
+  profileUsername: { fontSize: 12, marginTop: 2 },
 
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 12, paddingBottom: 12 },
@@ -146,7 +177,7 @@ const styles = StyleSheet.create({
 
   divider: {
     height: StyleSheet.hairlineWidth,
-    marginVertical: 16,
+    marginVertical: 12,
     marginHorizontal: 12,
   },
   sectionTitle: {

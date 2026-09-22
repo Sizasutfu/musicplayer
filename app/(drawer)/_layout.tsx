@@ -1,11 +1,11 @@
 // app/(drawer)/_layout.tsx
-import { Drawer } from 'expo-router/drawer';
-import { Pressable, StyleSheet } from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import { DrawerActions } from '@react-navigation/native';
-import { useNavigation } from 'expo-router';
-import CustomDrawerContent from '../../components/CustomDrawerContent';
-import { useTheme } from '../../context/ThemeContext';
+import { Drawer } from "expo-router/drawer";
+import { Pressable, StyleSheet } from "react-native";
+import { Feather } from "@expo/vector-icons";
+import { DrawerActions } from "@react-navigation/native";
+import { useNavigation } from "expo-router";
+import CustomDrawerContent from "../../components/CustomDrawerContent";
+import { useTheme } from "../../context/ThemeContext";
 
 function MenuButton() {
   const navigation = useNavigation();
@@ -29,7 +29,7 @@ export default function DrawerLayout() {
       screenOptions={{
         headerShown: true,
         headerStyle: { backgroundColor: colors.headerBg },
-        headerTitleStyle: { fontWeight: '700', color: colors.text },
+        headerTitleStyle: { fontWeight: "700", color: colors.text },
         headerTintColor: colors.text,
         headerShadowVisible: false,
         headerLeft: () => <MenuButton />,
@@ -37,11 +37,12 @@ export default function DrawerLayout() {
         swipeEdgeWidth: 60,
       }}
     >
-      <Drawer.Screen name="index" options={{ title: 'Library' }} />
-      <Drawer.Screen name="albums" options={{ title: 'Albums' }} />
-      <Drawer.Screen name="artists" options={{ title: 'Artists' }} />
-      <Drawer.Screen name="playlists" options={{ title: 'Playlists' }} />
-      <Drawer.Screen name="settings" options={{ title: 'Settings' }} />
+      <Drawer.Screen name="index" options={{ title: "Library" }} />
+      <Drawer.Screen name="albums" options={{ title: "Albums" }} />
+      <Drawer.Screen name="artists" options={{ title: "Artists" }} />
+      <Drawer.Screen name="playlists" options={{ title: "Playlists" }} />
+      <Drawer.Screen name="profile" options={{ title: "Profile" }} />
+      <Drawer.Screen name="settings" options={{ title: "Settings" }} />
     </Drawer>
   );
 }
