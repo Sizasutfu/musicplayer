@@ -1,4 +1,4 @@
-// app/(drawer)/playlists.tsx
+// app/(drawer)/(tabs)/playlists.tsx
 import React, { useState } from 'react';
 import {
   View,
@@ -15,17 +15,17 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePlaylists } from '../../../hooks/usePlaylists';
 import { useLibrary } from '../../../hooks/useLibrary';
 import { useTheme } from '../../../context/ThemeContext';
+import { useMiniPlayerOffset } from '../../../hooks/useTabBarHeight';
 import MiniPlayer from '../../../components/MiniPlayer';
 
 export default function PlaylistsScreen() {
   const { playlists, loaded, create, remove } = usePlaylists();
   const { songs } = useLibrary();
   const { colors, design } = useTheme();
-  const insets = useSafeAreaInsets();
+  const miniPlayerOffset = useMiniPlayerOffset();
 
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState('');
@@ -157,21 +157,25 @@ export default function PlaylistsScreen() {
             >
               No playlists yet
             </Text>
-            <Text style={[design.type.caption, { color: colors.textSecondary }]}>
+            <Text
+              style={[
+                design.type.caption,
+                { color: colors.textSecondary, marginTop: 4 },
+              ]}
+            >
               Create one to group your favourite tracks.
             </Text>
           </View>
         }
       />
 
-      {/* FAB */}
       <Pressable
         onPress={() => setCreateOpen(true)}
         style={({ pressed }) => [
           styles.fab,
           {
             backgroundColor: colors.primary,
-            bottom: insets.bottom + 100,
+            bottom: miniPlayerOffset + 60,
             shadowColor: colors.fabShadow,
           },
           pressed && { opacity: 0.9, transform: [{ scale: 0.96 }] },
@@ -272,7 +276,7 @@ export default function PlaylistsScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      <MiniPlayer />
+      <MiniPlayer bottomOffset={miniPlayerOffset} />
     </View>
   );
 }
@@ -286,7 +290,7 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 8,
   },
-  listContent: { paddingTop: 8, paddingBottom: 160 },
+  listContent: { paddingTop: 8, paddingBottom: 200 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

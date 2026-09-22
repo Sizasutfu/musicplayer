@@ -7,15 +7,14 @@ import {
   Pressable,
   Image,
   StyleSheet,
-  Platform,
   ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLibrary, type Song } from '../../../hooks/useLibrary';
 import { usePlayer } from '../../../context/PlayerContext.stub';
 import { useFavorites } from '../../../hooks/useFavorites';
 import { useTheme } from '../../../context/ThemeContext';
+import { useMiniPlayerOffset } from '../../../hooks/useTabBarHeight';
 import MiniPlayer from '../../../components/MiniPlayer';
 import SongActionSheet from '../../../components/SongActionSheet';
 import LikeButton from '../../../components/LikeButton';
@@ -25,22 +24,17 @@ export default function FavoritesScreen() {
   const { favorites } = useFavorites();
   const { playQueue, currentTrack } = usePlayer();
   const { colors, design } = useTheme();
-  const insets = useSafeAreaInsets();
+  const miniPlayerOffset = useMiniPlayerOffset();
 
   const [actionSong, setActionSong] = useState<Song | null>(null);
 
   const favoriteTracks: Song[] = useMemo(() => {
-    // Preserve the order they were liked in (newest last)
     const byUri = new Map<string, Song>();
     for (const s of songs) byUri.set(s.url, s);
     return favorites
       .map((uri) => byUri.get(uri))
       .filter((s): s is Song => Boolean(s));
   }, [songs, favorites]);
-
-  const tabBarHeight =
-    (Platform.OS === 'ios' ? 50 : 56) + insets.bottom;
-  const miniPlayerBottom = tabBarHeight + 12;
 
   if (libraryLoading) {
     return (
@@ -186,7 +180,7 @@ export default function FavoritesScreen() {
         </>
       )}
 
-      <MiniPlayer bottomOffset={miniPlayerBottom} />
+      <MiniPlayer bottomOffset={miniPlayerOffset} />
 
       <SongActionSheet
         visible={!!actionSong}

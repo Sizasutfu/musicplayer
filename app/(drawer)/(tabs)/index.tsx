@@ -1,4 +1,4 @@
-// app/(drawer)/index.tsx
+// app/(drawer)/(tabs)/index.tsx
 import React, {
   useCallback,
   useLayoutEffect,
@@ -19,26 +19,53 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from 'expo-router';
+import { useNavigation, router } from 'expo-router';
 import { DrawerActions } from '@react-navigation/native';
 import { useLibrary, type Song } from '../../../hooks/useLibrary';
 import { usePlayer } from '../../../context/PlayerContext.stub';
 import { useTheme } from '../../../context/ThemeContext';
+import { useProfile } from '../../../hooks/useProfile';
+import { useMiniPlayerOffset } from '../../../hooks/useTabBarHeight';
+import ProfileAvatar from '../../../components/ProfileAvatar';
 import MiniPlayer from '../../../components/MiniPlayer';
 import SongActionSheet from '../../../components/SongActionSheet';
+import LikeButton from '../../../components/LikeButton';
 
 type SortMode = 'title' | 'artist' | 'album';
 
 function MenuButton() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const { colors } = useTheme();
+
+  const openDrawer = () => {
+    const parent = navigation.getParent?.();
+    if (parent) {
+      parent.dispatch(DrawerActions.toggleDrawer());
+    } else {
+      navigation.dispatch(DrawerActions.toggleDrawer());
+    }
+  };
+
+  return (
+    <Pressable onPress={openDrawer} hitSlop={10} style={styles.headerBtn}>
+      <Feather name="menu" size={22} color={colors.icon} />
+    </Pressable>
+  );
+}
+
+function ProfileButton() {
+  const { profile } = useProfile();
   return (
     <Pressable
-      onPress={() => navigation.dispatch(DrawerActions.toggleDrawer())}
+      onPress={() => router.push('/profile')}
       hitSlop={10}
-      style={styles.headerBtn}
+      style={styles.profileBtn}
     >
-      <Feather name="menu" size={22} color={colors.icon} />
+      <ProfileAvatar
+        name={profile.name}
+        color={profile.avatarColor}
+        size={30}
+      />
     </Pressable>
   );
 }
@@ -48,6 +75,7 @@ export default function LibraryScreen() {
   const { playQueue, currentTrack } = usePlayer();
   const { colors, design } = useTheme();
   const navigation = useNavigation();
+  const miniPlayerOffset = useMiniPlayerOffset();
 
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -64,6 +92,9 @@ export default function LibraryScreen() {
   useLayoutEffect(() => {
     if (searchOpen) {
       navigation.setOptions({
+        headerShown: true,
+        headerStyle: { backgroundColor: colors.headerBg },
+        headerShadowVisible: false,
         headerTitle: () => (
           <TextInput
             ref={inputRef}
@@ -100,16 +131,23 @@ export default function LibraryScreen() {
       });
     } else {
       navigation.setOptions({
+        headerShown: true,
+        headerStyle: { backgroundColor: colors.headerBg },
+        headerShadowVisible: false,
         headerTitle: 'Library',
+        headerTitleStyle: { color: colors.text, fontWeight: '700' },
         headerLeft: () => <MenuButton />,
         headerRight: () => (
-          <Pressable
-            onPress={openSearch}
-            hitSlop={10}
-            style={styles.headerBtn}
-          >
-            <Feather name="search" size={20} color={colors.icon} />
-          </Pressable>
+          <View style={styles.headerRightGroup}>
+            <Pressable
+              onPress={openSearch}
+              hitSlop={10}
+              style={styles.headerBtn}
+            >
+              <Feather name="search" size={20} color={colors.icon} />
+            </Pressable>
+            <ProfileButton />
+          </View>
         ),
       });
     }
@@ -150,7 +188,12 @@ export default function LibraryScreen() {
         edges={['left', 'right']}
       >
         <ActivityIndicator color={colors.primary} />
-        <Text style={[styles.mutedText, { color: colors.textSecondary }]}>
+        <Text
+          style={[
+            design.type.caption,
+            { color: colors.textSecondary, marginTop: 8 },
+          ]}
+        >
           Loading your library…
         </Text>
       </SafeAreaView>
@@ -165,18 +208,37 @@ export default function LibraryScreen() {
       >
         <Feather name="music" size={42} color={colors.iconMuted} />
         <Text
-          style={[design.type.heading, { color: colors.text, marginTop: 4 }]}
+          style={[
+            design.type.heading,
+            { color: colors.text, marginTop: 8 },
+          ]}
         >
           No access to your music
         </Text>
-        <Text style={[styles.mutedText, { color: colors.textSecondary }]}>
+        <Text
+          style={[
+            design.type.caption,
+            { color: colors.textSecondary, marginTop: 4 },
+          ]}
+        >
           Grant permission to see songs on this device.
         </Text>
         <Pressable
-          style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
+          style={[
+            styles.primaryBtn,
+            {
+              backgroundColor: colors.primary,
+              borderRadius: design.radius.pill,
+            },
+          ]}
           onPress={refresh}
         >
-          <Text style={[styles.primaryBtnText, { color: colors.primaryText }]}>
+          <Text
+            style={[
+              design.type.caption,
+              { color: colors.primaryText, fontWeight: '700' },
+            ]}
+          >
             Grant permission
           </Text>
         </Pressable>
@@ -193,14 +255,30 @@ export default function LibraryScreen() {
         <Text style={[design.type.heading, { color: colors.text }]}>
           Something went wrong
         </Text>
-        <Text style={[styles.mutedText, { color: colors.textSecondary }]}>
+        <Text
+          style={[
+            design.type.caption,
+            { color: colors.textSecondary, marginTop: 4 },
+          ]}
+        >
           {error}
         </Text>
         <Pressable
-          style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
+          style={[
+            styles.primaryBtn,
+            {
+              backgroundColor: colors.primary,
+              borderRadius: design.radius.pill,
+            },
+          ]}
           onPress={refresh}
         >
-          <Text style={[styles.primaryBtnText, { color: colors.primaryText }]}>
+          <Text
+            style={[
+              design.type.caption,
+              { color: colors.primaryText, fontWeight: '700' },
+            ]}
+          >
             Try again
           </Text>
         </Pressable>
@@ -209,20 +287,8 @@ export default function LibraryScreen() {
   }
 
   return (
-    <SafeAreaView
-      style={[styles.root, { backgroundColor: colors.background }]}
-      edges={['left', 'right']}
-    >
-      <View
-        style={[
-          styles.sortRow,
-          {
-            paddingTop: design.spacing.section - 8,
-            paddingBottom: design.spacing.item,
-            gap: design.spacing.item - 4,
-          },
-        ]}
-      >
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <View style={styles.sortRow}>
         {(['title', 'artist', 'album'] as SortMode[]).map((mode) => {
           const active = sort === mode;
           return (
@@ -231,15 +297,21 @@ export default function LibraryScreen() {
               onPress={() => setSort(mode)}
               style={[
                 styles.sortBtn,
-                { backgroundColor: colors.chipBg, borderRadius: design.radius.pill },
+                {
+                  backgroundColor: colors.chipBg,
+                  borderRadius: design.radius.pill,
+                },
                 active && { backgroundColor: colors.chipBgActive },
               ]}
             >
               <Text
                 style={[
                   design.type.caption,
-                  { color: colors.chipText },
-                  active && { color: colors.chipTextActive, fontWeight: '700' },
+                  { color: colors.chipText, fontWeight: '600' },
+                  active && {
+                    color: colors.chipTextActive,
+                    fontWeight: '700',
+                  },
                 ]}
               >
                 {mode.charAt(0).toUpperCase() + mode.slice(1)}
@@ -273,7 +345,7 @@ export default function LibraryScreen() {
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingBottom: 160 }}
+        contentContainerStyle={{ paddingBottom: 200 }}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         initialNumToRender={20}
@@ -292,10 +364,20 @@ export default function LibraryScreen() {
         ListEmptyComponent={
           <View style={styles.center}>
             <Feather name="music" size={42} color={colors.iconMuted} />
-            <Text style={[design.type.heading, { color: colors.text }]}>
+            <Text
+              style={[
+                design.type.heading,
+                { color: colors.text, marginTop: 8 },
+              ]}
+            >
               {query ? 'No matches' : 'No songs found'}
             </Text>
-            <Text style={[styles.mutedText, { color: colors.textSecondary }]}>
+            <Text
+              style={[
+                design.type.caption,
+                { color: colors.textSecondary, marginTop: 4 },
+              ]}
+            >
               {query
                 ? 'Try a different search.'
                 : 'Add audio files to this device to see them here.'}
@@ -304,14 +386,14 @@ export default function LibraryScreen() {
         }
       />
 
-      <MiniPlayer />
+      <MiniPlayer bottomOffset={miniPlayerOffset} />
 
       <SongActionSheet
         visible={!!actionSong}
         song={actionSong}
         onClose={() => setActionSong(null)}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -351,7 +433,10 @@ const SongRow = React.memo(function SongRow({
           source={{ uri: song.artwork }}
           style={[
             styles.artImage,
-            { borderRadius: design.radius.item, backgroundColor: colors.artPlaceholder },
+            {
+              borderRadius: design.radius.item,
+              backgroundColor: colors.artPlaceholder,
+            },
           ]}
         />
       ) : (
@@ -398,7 +483,11 @@ const SongRow = React.memo(function SongRow({
         </Text>
       </View>
 
-      {isActive && <Feather name="volume-2" size={16} color={colors.primary} />}
+      {isActive && (
+        <Feather name="volume-2" size={16} color={colors.primary} />
+      )}
+
+      <LikeButton uri={song.url} size={18} />
     </Pressable>
   );
 });
@@ -410,29 +499,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
-    gap: 8,
+    gap: 4,
   },
-  mutedText: { fontSize: 14, textAlign: 'center' },
   primaryBtn: {
     marginTop: 14,
     paddingHorizontal: 20,
     paddingVertical: 11,
-    borderRadius: 24,
   },
-  primaryBtnText: { fontWeight: '700', fontSize: 14 },
-
-  headerBtn: { paddingHorizontal: 14, paddingVertical: 8 },
+  headerBtn: { paddingHorizontal: 12, paddingVertical: 8 },
+  profileBtn: { paddingHorizontal: 8, paddingVertical: 6 },
+  headerRightGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   headerSearchInput: {
     flex: 1,
     fontSize: 16,
     paddingVertical: Platform.OS === 'ios' ? 8 : 4,
     minWidth: 200,
   },
-
   sortRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
     paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
   },
   sortBtn: {
     paddingHorizontal: 14,
@@ -446,7 +538,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
-
   row: {
     flexDirection: 'row',
     alignItems: 'center',
