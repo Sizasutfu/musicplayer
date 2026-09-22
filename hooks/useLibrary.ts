@@ -20,7 +20,7 @@ type State = {
   songs: Song[];
   loading: boolean;
   granting: boolean;
-  enriching: boolean;   // true while metadata extraction is in progress
+  enriching: boolean;
   granted: boolean;
   error: string | null;
   refresh: () => Promise<void>;
@@ -41,7 +41,14 @@ export function useLibrary(): State {
     cancelled.current = false;
 
     try {
-      const perm = await MediaLibrary.requestPermissionsAsync();
+      // ── Request audio-only permission ─────────────────────
+      // Second arg (granularPermissions) is what Android 13+ uses
+      // to show "Music and audio" instead of "Files and media".
+      const perm = await MediaLibrary.requestPermissionsAsync(
+        false,       // writeOnly: false → we only read
+        ['audio']    // granularPermissions: audio only
+      );
+
       if (!perm.granted) {
         setGranted(false);
         setSongs([]);
@@ -51,13 +58,14 @@ export function useLibrary(): State {
       setGranted(true);
       setGranting(false);
 
+      // ── Load audio assets ─────────────────────────────────
       const { assets } = await MediaLibrary.getAssetsAsync({
         mediaType: MediaLibrary.MediaType.audio,
         first: 1000,
         sortBy: [MediaLibrary.SortBy.default],
       });
 
-      // Step 1: Build a "fast" list from what we already know
+      // Step 1: Build a fast list from filename + duration
       const fast: Song[] = assets.map((a) => {
         const fallback = mergeMetadata(a.filename, {});
         return {
@@ -73,7 +81,7 @@ export function useLibrary(): State {
       setLoading(false);
       setEnriching(true);
 
-      // Step 2: Load cached metadata first (fast, synchronous-ish)
+      // Step 2: Apply cached metadata first (fast)
       const withCache: Song[] = await Promise.all(
         fast.map(async (s) => {
           const cached = await getCached(s.url);
@@ -84,7 +92,9 @@ export function useLibrary(): State {
       setSongs(withCache);
 
       // Step 3: Extract ID3 tags for uncached tracks, one at a time
-      const uncached = withCache.filter((s) => !s.artwork && s.artist === 'Unknown Artist');
+      const uncached = withCache.filter(
+        (s) => !s.artwork && s.artist === 'Unknown Artist'
+      );
 
       for (const song of uncached) {
         if (cancelled.current) return;
@@ -92,14 +102,10 @@ export function useLibrary(): State {
         const tags = await readTags(song.url);
         const merged = mergeMetadata(song.filename, tags);
 
-        // Cache it
         await setCached(song.url, merged);
 
-        // Update state incrementally
         setSongs((prev) =>
-          prev.map((p) =>
-            p.id === song.id ? { ...p, ...merged } : p
-          )
+          prev.map((p) => (p.id === song.id ? { ...p, ...merged } : p))
         );
       }
     } catch (e: any) {
@@ -121,5 +127,13 @@ export function useLibrary(): State {
     };
   }, [load]);
 
-  return { songs, loading, granting, enriching, granted, error, refresh: load };
+  return {
+    songs,
+    loading,
+    granting,
+    enriching,
+    granted,
+    error,
+    refresh: load,
+  };
 }

@@ -12,12 +12,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useLibrary, type Song } from '../../../hooks/useLibrary';
-import { groupByAlbum } from '../../../lib/metadata';
-import { usePlayer } from '../../../context/PlayerContext.stub';
-import { useTheme } from '../../../context/ThemeContext';
-import MiniPlayer from '../../../components/MiniPlayer';
-import SongActionSheet from '../../../components/SongActionSheet';
+import { useLibrary, type Song } from '../../hooks/useLibrary';
+import { groupByAlbum } from '../../lib/metadata';
+import { usePlayer } from '../../context/PlayerContext.stub';
+import { useTheme } from '../../context/ThemeContext';
+import MiniPlayer from '../../components/MiniPlayer';
+import SongActionSheet from '../../components/SongActionSheet';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ART_SIZE = Math.min(SCREEN_WIDTH - 64, 260);
