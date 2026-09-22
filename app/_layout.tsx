@@ -23,15 +23,15 @@ function ThemedStack() {
         <Stack.Screen name="(drawer)" />
         <Stack.Screen
           name="album/[key]"
-          options={{ headerShown: false, animation: 'slide_from_right' }}
+          options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen
           name="artist/[name]"
-          options={{ headerShown: false, animation: 'slide_from_right' }}
+          options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen
           name="playlist/[id]"
-          options={{ headerShown: false, animation: 'slide_from_right' }}
+          options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen
           name="player"

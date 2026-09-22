@@ -21,11 +21,11 @@ import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from 'expo-router';
 import { DrawerActions } from '@react-navigation/native';
-import { useLibrary, type Song } from '../../hooks/useLibrary';
-import { usePlayer } from '../../context/PlayerContext.stub';
-import { useTheme } from '../../context/ThemeContext';
-import MiniPlayer from '../../components/MiniPlayer';
-import SongActionSheet from '../../components/SongActionSheet';
+import { useLibrary, type Song } from '../../../hooks/useLibrary';
+import { usePlayer } from '../../../context/PlayerContext.stub';
+import { useTheme } from '../../../context/ThemeContext';
+import MiniPlayer from '../../../components/MiniPlayer';
+import SongActionSheet from '../../../components/SongActionSheet';
 
 type SortMode = 'title' | 'artist' | 'album';
 

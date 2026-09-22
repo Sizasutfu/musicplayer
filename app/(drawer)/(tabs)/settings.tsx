@@ -13,10 +13,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useTheme } from '../../context/ThemeContext';
-import { clearCache } from '../../lib/metadata';
-import { resetOnboarding } from '../../lib/onboarding';
-import { useLibrary } from '../../hooks/useLibrary';
+import { useTheme } from '../../../context/ThemeContext';
+import { clearCache } from '../../../lib/metadata';
+import { resetOnboarding } from '../../../lib/onboarding';
+import { useLibrary } from '../../../hooks/useLibrary';
 
 type IconName = React.ComponentProps<typeof Feather>['name'];
 type Colors = ReturnType<typeof useTheme>['colors'];

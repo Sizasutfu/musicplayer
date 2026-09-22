@@ -99,12 +99,12 @@ export default function WelcomeScreen() {
 
   const finish = async () => {
     await markOnboardingSeen();
-    router.replace('/(drawer)');
+    router.replace('/');
   };
 
   const skip = async () => {
     await markOnboardingSeen();
-    router.replace('/(drawer)');
+    router.replace('/');
   };
 
   return (

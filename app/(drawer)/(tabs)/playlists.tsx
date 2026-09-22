@@ -16,10 +16,10 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { usePlaylists } from '../../hooks/usePlaylists';
-import { useLibrary } from '../../hooks/useLibrary';
-import { useTheme } from '../../context/ThemeContext';
-import MiniPlayer from '../../components/MiniPlayer';
+import { usePlaylists } from '../../../hooks/usePlaylists';
+import { useLibrary } from '../../../hooks/useLibrary';
+import { useTheme } from '../../../context/ThemeContext';
+import MiniPlayer from '../../../components/MiniPlayer';
 
 export default function PlaylistsScreen() {
   const { playlists, loaded, create, remove } = usePlaylists();

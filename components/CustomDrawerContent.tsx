@@ -9,12 +9,24 @@ import { useTheme } from '../context/ThemeContext';
 import { useProfile } from '../hooks/useProfile';
 import ProfileAvatar from './ProfileAvatar';
 
-const NAV_ITEMS = [
-  { name: 'index', label: 'Library', icon: 'music' as const, route: '/' },
-  { name: 'albums', label: 'Albums', icon: 'disc' as const, route: '/albums' },
-  { name: 'artists', label: 'Artists', icon: 'user' as const, route: '/artists' },
-  { name: 'playlists', label: 'Playlists', icon: 'list' as const, route: '/playlists' },
-  { name: 'settings', label: 'Settings', icon: 'settings' as const, route: '/settings' },
+type Item = {
+  key: string;
+  label: string;
+  icon: React.ComponentProps<typeof Feather>['name'];
+  route: string;
+};
+
+const PRIMARY: Item[] = [
+  { key: 'index', label: 'Library', icon: 'music', route: '/(drawer)/(tabs)' },
+  { key: 'playlists', label: 'Playlists', icon: 'list', route: '/(drawer)/(tabs)/playlists' },
+  { key: 'favorites', label: 'Favorites', icon: 'heart', route: '/(drawer)/(tabs)/favorites' },
+  { key: 'settings', label: 'Settings', icon: 'settings', route: '/(drawer)/(tabs)/settings' },
+];
+
+const BROWSE: Item[] = [
+  { key: 'albums', label: 'Albums', icon: 'disc', route: '/(drawer)/albums' },
+  { key: 'artists', label: 'Artists', icon: 'user', route: '/(drawer)/artists' },
+  { key: 'profile', label: 'Profile', icon: 'user-check', route: '/(drawer)/profile' },
 ];
 
 export default function CustomDrawerContent(
@@ -25,8 +37,52 @@ export default function CustomDrawerContent(
   const activeRoute = props.state.routeNames[props.state.index];
 
   const goToProfile = () => {
-    router.push('/profile');
+    router.push('/(drawer)/profile');
     props.navigation.closeDrawer();
+  };
+
+  const go = (route: string) => {
+    router.push(route as any);
+    props.navigation.closeDrawer();
+  };
+
+  const renderItem = (item: Item) => {
+    const active = activeRoute === item.key;
+    return (
+      <Pressable
+        key={item.key}
+        onPress={() => go(item.route)}
+        style={({ pressed }) => [
+          styles.row,
+          {
+            borderRadius: design.radius.item,
+            marginBottom: design.spacing.item - 10,
+          },
+          active && { backgroundColor: colors.rowActive },
+          pressed && { opacity: 0.6 },
+        ]}
+      >
+        <Feather
+          name={item.icon}
+          size={20}
+          color={active ? colors.primary : colors.iconMuted}
+        />
+        <Text
+          style={[
+            design.type.body,
+            { color: active ? colors.primary : colors.textSecondary },
+            active && { fontWeight: '700' },
+          ]}
+        >
+          {item.label}
+        </Text>
+        {active && (
+          <View
+            style={[styles.activeDot, { backgroundColor: colors.primary }]}
+          />
+        )}
+      </Pressable>
+    );
   };
 
   return (
@@ -34,7 +90,6 @@ export default function CustomDrawerContent(
       style={[styles.root, { backgroundColor: colors.surface }]}
       edges={['top', 'bottom']}
     >
-      {/* Profile header */}
       <Pressable
         onPress={goToProfile}
         style={({ pressed }) => [
@@ -77,47 +132,19 @@ export default function CustomDrawerContent(
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {NAV_ITEMS.map((item) => {
-          const active = activeRoute === item.name;
-          return (
-            <Pressable
-              key={item.name}
-              onPress={() => {
-                router.push(item.route as any);
-                props.navigation.closeDrawer();
-              }}
-              style={({ pressed }) => [
-                styles.row,
-                {
-                  borderRadius: design.radius.item,
-                  marginBottom: design.spacing.item - 10,
-                },
-                active && { backgroundColor: colors.rowActive },
-                pressed && { opacity: 0.6 },
-              ]}
-            >
-              <Feather
-                name={item.icon}
-                size={20}
-                color={active ? colors.primary : colors.iconMuted}
-              />
-              <Text
-                style={[
-                  design.type.body,
-                  { color: active ? colors.primary : colors.textSecondary },
-                  active && { fontWeight: '700' },
-                ]}
-              >
-                {item.label}
-              </Text>
-              {active && (
-                <View
-                  style={[styles.activeDot, { backgroundColor: colors.primary }]}
-                />
-              )}
-            </Pressable>
-          );
-        })}
+        <Text
+          style={[
+            design.type.sectionLabel,
+            {
+              color: colors.textMuted,
+              paddingHorizontal: 12,
+              marginBottom: 8,
+            },
+          ]}
+        >
+          YOUR MUSIC
+        </Text>
+        {PRIMARY.map(renderItem)}
 
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
@@ -131,29 +158,9 @@ export default function CustomDrawerContent(
             },
           ]}
         >
-          PLAYLISTS
+          BROWSE
         </Text>
-
-        {['Recently Added', 'Favorites', 'Downloaded'].map((name) => (
-          <Pressable
-            key={name}
-            style={({ pressed }) => [
-              styles.playlistRow,
-              { borderRadius: design.radius.item - 2 },
-              pressed && { opacity: 0.6 },
-            ]}
-          >
-            <Feather name="folder" size={16} color={colors.iconMuted} />
-            <Text
-              style={[
-                design.type.caption,
-                { color: colors.textSecondary },
-              ]}
-            >
-              {name}
-            </Text>
-          </Pressable>
-        ))}
+        {BROWSE.map(renderItem)}
       </ScrollView>
 
       <View style={[styles.footer, { borderTopColor: colors.border }]}>
@@ -172,7 +179,6 @@ export default function CustomDrawerContent(
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-
   profileHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -181,10 +187,8 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 16,
   },
-
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 12, paddingBottom: 12 },
-
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -193,21 +197,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   activeDot: { width: 6, height: 6, borderRadius: 3 },
-
   divider: {
     height: StyleSheet.hairlineWidth,
     marginVertical: 12,
     marginHorizontal: 12,
   },
-
-  playlistRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-
   footer: {
     paddingHorizontal: 20,
     paddingVertical: 12,
