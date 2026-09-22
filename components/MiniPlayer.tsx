@@ -10,8 +10,8 @@ import { useTheme } from '../context/ThemeContext';
 type Props = {
   /**
    * Extra space below the mini player. Inside a tab navigator, pass the
-   * tab bar height + 12. Outside tabs, leave undefined so the OS
-   * gesture bar is accounted for automatically.
+   * tab bar height + 12 so it sits above the tab bar. Outside tabs,
+   * leave undefined and the OS gesture bar inset is applied automatically.
    */
   bottomOffset?: number;
 };
