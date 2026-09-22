@@ -35,7 +35,7 @@ export default function PlayerScreen() {
     previous,
     seekTo,
   } = usePlayer();
-  const { colors } = useTheme();
+  const { colors, design } = useTheme();
 
   const [seeking, setSeeking] = useState(false);
   const [scrubPosition, setScrubPosition] = useState(0);
@@ -62,17 +62,28 @@ export default function PlayerScreen() {
       style={[styles.root, { backgroundColor: colors.background }]}
       edges={['top', 'bottom']}
     >
-      {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={handleClose} hitSlop={10} style={styles.headerBtn}>
           <Feather name="chevron-down" size={26} color={colors.icon} />
         </Pressable>
         <View style={{ alignItems: 'center' }}>
-          <Text style={[styles.headerEyebrow, { color: colors.textMuted }]}>
+          <Text
+            style={[
+              design.type.sectionLabel,
+              { color: colors.textMuted, fontSize: 10 },
+            ]}
+          >
             NOW PLAYING
           </Text>
           <Text
-            style={[styles.headerTitle, { color: colors.text }]}
+            style={[
+              design.type.caption,
+              {
+                color: colors.text,
+                fontWeight: '700',
+                maxWidth: 200,
+              },
+            ]}
             numberOfLines={1}
           >
             {currentTrack?.album || 'Library'}
@@ -87,27 +98,34 @@ export default function PlayerScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Album art */}
         <View style={styles.artWrap}>
           <View
-            style={[styles.art, { backgroundColor: colors.artPlaceholder }]}
+            style={[
+              styles.art,
+              {
+                backgroundColor: colors.artPlaceholder,
+                borderRadius: design.radius.card + 6,
+              },
+            ]}
           >
             <Feather name="music" size={72} color={colors.iconMuted} />
           </View>
         </View>
 
-        {/* Track info */}
         <View style={styles.infoRow}>
           <View style={{ flex: 1 }}>
             <Text
               numberOfLines={1}
-              style={[styles.title, { color: colors.text }]}
+              style={[design.type.title, { color: colors.text }]}
             >
               {currentTrack?.title || 'Nothing playing'}
             </Text>
             <Text
               numberOfLines={1}
-              style={[styles.artist, { color: colors.textSecondary }]}
+              style={[
+                design.type.body,
+                { color: colors.textSecondary, marginTop: 4 },
+              ]}
             >
               {currentTrack?.artist || '—'}
             </Text>
@@ -117,7 +135,6 @@ export default function PlayerScreen() {
           </Pressable>
         </View>
 
-        {/* Seek bar */}
         <View style={styles.seekWrap}>
           <SeekBar
             position={displayPosition}
@@ -126,16 +143,31 @@ export default function PlayerScreen() {
             onSeekingChange={setSeeking}
           />
           <View style={styles.timeRow}>
-            <Text style={[styles.timeText, { color: colors.textMuted }]}>
+            <Text
+              style={[
+                design.type.caption,
+                {
+                  color: colors.textMuted,
+                  fontVariant: ['tabular-nums'],
+                },
+              ]}
+            >
               {formatTime(displayPosition)}
             </Text>
-            <Text style={[styles.timeText, { color: colors.textMuted }]}>
+            <Text
+              style={[
+                design.type.caption,
+                {
+                  color: colors.textMuted,
+                  fontVariant: ['tabular-nums'],
+                },
+              ]}
+            >
               {formatTime(duration)}
             </Text>
           </View>
         </View>
 
-        {/* Controls */}
         <View style={styles.controls}>
           <Pressable hitSlop={10} style={styles.smallBtn}>
             <Feather name="shuffle" size={22} color={colors.iconMuted} />
@@ -173,7 +205,6 @@ export default function PlayerScreen() {
           </Pressable>
         </View>
 
-        {/* Bottom row */}
         <View
           style={[styles.bottomRow, { borderTopColor: colors.border }]}
         >
@@ -205,16 +236,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerEyebrow: {
-    fontSize: 10,
-    letterSpacing: 1.5,
-    fontWeight: '700',
-  },
-  headerTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    maxWidth: 200,
-  },
 
   scrollContent: {
     paddingHorizontal: 24,
@@ -230,7 +251,6 @@ const styles = StyleSheet.create({
   art: {
     width: ART_SIZE,
     height: ART_SIZE,
-    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -245,8 +265,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
-  title: { fontSize: 22, fontWeight: '800' },
-  artist: { fontSize: 15, marginTop: 4 },
   likeBtn: { padding: 8 },
 
   seekWrap: { marginBottom: 8 },
@@ -255,7 +273,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 4,
   },
-  timeText: { fontSize: 12, fontVariant: ['tabular-nums'] },
 
   controls: {
     flexDirection: 'row',

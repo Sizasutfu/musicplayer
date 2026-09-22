@@ -34,7 +34,7 @@ export default function SongActionSheet({
   onClose,
   extraActions,
 }: Props) {
-  const { colors } = useTheme();
+  const { colors, design } = useTheme();
   const [playlistOpen, setPlaylistOpen] = useState(false);
 
   const close = () => {
@@ -91,13 +91,19 @@ export default function SongActionSheet({
               >
                 <Text
                   numberOfLines={1}
-                  style={[styles.songTitle, { color: colors.text }]}
+                  style={[
+                    design.type.body,
+                    { color: colors.text, fontWeight: '700', fontSize: 16 },
+                  ]}
                 >
                   {song.title}
                 </Text>
                 <Text
                   numberOfLines={1}
-                  style={[styles.songArtist, { color: colors.textSecondary }]}
+                  style={[
+                    design.type.caption,
+                    { color: colors.textSecondary, marginTop: 2 },
+                  ]}
                 >
                   {song.artist}
                 </Text>
@@ -109,18 +115,21 @@ export default function SongActionSheet({
               label="Add to playlist"
               onPress={() => setPlaylistOpen(true)}
               colors={colors}
+              design={design}
             />
             <ActionRow
               icon="play-circle"
               label="Play next"
               onPress={handlePlayNext}
               colors={colors}
+              design={design}
             />
             <ActionRow
               icon="list"
               label="Add to queue"
               onPress={handleAddToQueue}
               colors={colors}
+              design={design}
               last={!extraActions || extraActions.length === 0}
             />
 
@@ -135,6 +144,7 @@ export default function SongActionSheet({
                 }}
                 destructive={action.destructive}
                 colors={colors}
+                design={design}
                 last={i === extraActions.length - 1}
               />
             ))}
@@ -144,7 +154,10 @@ export default function SongActionSheet({
               style={[styles.cancel, { borderTopColor: colors.border }]}
             >
               <Text
-                style={[styles.cancelText, { color: colors.textSecondary }]}
+                style={[
+                  design.type.body,
+                  { color: colors.textSecondary, fontWeight: '600' },
+                ]}
               >
                 Cancel
               </Text>
@@ -167,6 +180,7 @@ function ActionRow({
   label,
   onPress,
   colors,
+  design,
   destructive,
   last,
 }: {
@@ -174,6 +188,7 @@ function ActionRow({
   label: string;
   onPress: () => void;
   colors: any;
+  design: any;
   destructive?: boolean;
   last?: boolean;
 }) {
@@ -196,6 +211,7 @@ function ActionRow({
             backgroundColor: destructive
               ? 'rgba(239,68,68,0.12)'
               : colors.rowActive,
+            borderRadius: design.radius.item - 2,
           },
         ]}
       >
@@ -207,8 +223,12 @@ function ActionRow({
       </View>
       <Text
         style={[
-          styles.rowLabel,
-          { color: destructive ? colors.danger : colors.text },
+          design.type.body,
+          {
+            flex: 1,
+            color: destructive ? colors.danger : colors.text,
+            fontWeight: '600',
+          },
         ]}
       >
         {label}
@@ -237,8 +257,6 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 14,
   },
-  songTitle: { fontSize: 16, fontWeight: '700' },
-  songArtist: { fontSize: 13, marginTop: 2 },
 
   row: {
     flexDirection: 'row',
@@ -250,16 +268,13 @@ const styles = StyleSheet.create({
   rowIcon: {
     width: 32,
     height: 32,
-    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rowLabel: { flex: 1, fontSize: 15, fontWeight: '600' },
 
   cancel: {
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingVertical: 14,
     alignItems: 'center',
   },
-  cancelText: { fontSize: 14, fontWeight: '600' },
 });

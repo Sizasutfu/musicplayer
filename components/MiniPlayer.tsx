@@ -9,7 +9,7 @@ import { useTheme } from '../context/ThemeContext';
 
 export default function MiniPlayer() {
   const { currentTrack, isPlaying, togglePlayPause, next } = usePlayer();
-  const { colors } = useTheme();
+  const { colors, design } = useTheme();
   const insets = useSafeAreaInsets();
 
   if (!currentTrack) return null;
@@ -20,25 +20,40 @@ export default function MiniPlayer() {
         styles.container,
         {
           backgroundColor: colors.miniPlayerBg,
+          borderRadius: design.radius.card,
           bottom: insets.bottom + 12,
         },
       ]}
       onPress={() => router.push('/player')}
     >
-      <View style={[styles.art, { backgroundColor: colors.miniPlayerBtnBg }]}>
+      <View
+        style={[
+          styles.art,
+          {
+            backgroundColor: colors.miniPlayerBtnBg,
+            borderRadius: design.radius.item - 2,
+          },
+        ]}
+      >
         <Feather name="music" size={18} color={colors.miniPlayerText} />
       </View>
 
       <View style={{ flex: 1 }}>
         <Text
           numberOfLines={1}
-          style={[styles.title, { color: colors.miniPlayerText }]}
+          style={[
+            design.type.caption,
+            { color: colors.miniPlayerText, fontWeight: '700', fontSize: 14 },
+          ]}
         >
           {currentTrack.title}
         </Text>
         <Text
           numberOfLines={1}
-          style={[styles.sub, { color: colors.miniPlayerTextSecondary }]}
+          style={[
+            design.type.caption,
+            { color: colors.miniPlayerTextSecondary, marginTop: 1 },
+          ]}
         >
           {currentTrack.artist}
         </Text>
@@ -78,12 +93,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 12,
     right: 12,
-    // bottom set dynamically in component via insets
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     padding: 10,
-    borderRadius: 14,
     shadowColor: '#000',
     shadowOpacity: 0.2,
     shadowRadius: 12,
@@ -93,12 +106,9 @@ const styles = StyleSheet.create({
   art: {
     width: 40,
     height: 40,
-    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  title: { fontSize: 14, fontWeight: '700' },
-  sub: { fontSize: 12, marginTop: 1 },
   iconBtn: {
     width: 34,
     height: 34,

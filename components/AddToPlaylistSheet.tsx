@@ -26,7 +26,7 @@ type Props = {
 };
 
 export default function AddToPlaylistSheet({ visible, song, onClose }: Props) {
-  const { colors } = useTheme();
+  const { colors, design } = useTheme();
   const { playlists, create, addTrack } = usePlaylists();
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState('');
@@ -81,19 +81,26 @@ export default function AddToPlaylistSheet({ visible, song, onClose }: Props) {
           edges={['bottom']}
         >
           <View style={styles.handleWrap}>
-            <View style={[styles.handle, { backgroundColor: colors.border }]} />
+            <View
+              style={[styles.handle, { backgroundColor: colors.border }]}
+            />
           </View>
 
           {!createOpen ? (
             <>
               <View style={styles.header}>
-                <Text style={[styles.title, { color: colors.text }]}>
+                <Text
+                  style={[design.type.heading, { color: colors.text }]}
+                >
                   Add to playlist
                 </Text>
                 {song && (
                   <Text
                     numberOfLines={1}
-                    style={[styles.subtitle, { color: colors.textSecondary }]}
+                    style={[
+                      design.type.caption,
+                      { color: colors.textSecondary, marginTop: 4 },
+                    ]}
                   >
                     {song.title} · {song.artist}
                   </Text>
@@ -112,11 +119,26 @@ export default function AddToPlaylistSheet({ visible, song, onClose }: Props) {
                 ]}
               >
                 <View
-                  style={[styles.rowIcon, { backgroundColor: colors.rowActive }]}
+                  style={[
+                    styles.rowIcon,
+                    {
+                      backgroundColor: colors.rowActive,
+                      borderRadius: design.radius.item - 2,
+                    },
+                  ]}
                 >
                   <Feather name="plus" size={18} color={colors.primary} />
                 </View>
-                <Text style={[styles.rowLabel, { color: colors.primary }]}>
+                <Text
+                  style={[
+                    design.type.body,
+                    {
+                      flex: 1,
+                      color: colors.primary,
+                      fontWeight: '600',
+                    },
+                  ]}
+                >
                   New playlist
                 </Text>
               </Pressable>
@@ -128,7 +150,10 @@ export default function AddToPlaylistSheet({ visible, song, onClose }: Props) {
                 ListEmptyComponent={
                   <View style={styles.empty}>
                     <Text
-                      style={[styles.emptyText, { color: colors.textMuted }]}
+                      style={[
+                        design.type.caption,
+                        { color: colors.textMuted, textAlign: 'center' },
+                      ]}
                     >
                       No playlists yet — create one above.
                     </Text>
@@ -155,7 +180,10 @@ export default function AddToPlaylistSheet({ visible, song, onClose }: Props) {
                       <View
                         style={[
                           styles.rowIcon,
-                          { backgroundColor: colors.rowActive },
+                          {
+                            backgroundColor: colors.rowActive,
+                            borderRadius: design.radius.item - 2,
+                          },
                         ]}
                       >
                         <Feather name="list" size={18} color={colors.primary} />
@@ -163,12 +191,18 @@ export default function AddToPlaylistSheet({ visible, song, onClose }: Props) {
                       <View style={{ flex: 1 }}>
                         <Text
                           numberOfLines={1}
-                          style={[styles.rowLabel, { color: colors.text }]}
+                          style={[
+                            design.type.body,
+                            { color: colors.text, fontWeight: '600' },
+                          ]}
                         >
                           {item.name}
                         </Text>
                         <Text
-                          style={[styles.rowMeta, { color: colors.textMuted }]}
+                          style={[
+                            design.type.caption,
+                            { color: colors.textMuted, marginTop: 2 },
+                          ]}
                         >
                           {item.trackUris.length}{' '}
                           {item.trackUris.length === 1 ? 'track' : 'tracks'}
@@ -191,7 +225,10 @@ export default function AddToPlaylistSheet({ visible, song, onClose }: Props) {
                 style={[styles.cancel, { borderTopColor: colors.border }]}
               >
                 <Text
-                  style={[styles.cancelText, { color: colors.textSecondary }]}
+                  style={[
+                    design.type.body,
+                    { color: colors.textSecondary, fontWeight: '600' },
+                  ]}
                 >
                   Cancel
                 </Text>
@@ -200,11 +237,16 @@ export default function AddToPlaylistSheet({ visible, song, onClose }: Props) {
           ) : (
             <>
               <View style={styles.header}>
-                <Text style={[styles.title, { color: colors.text }]}>
+                <Text
+                  style={[design.type.heading, { color: colors.text }]}
+                >
                   New playlist
                 </Text>
                 <Text
-                  style={[styles.subtitle, { color: colors.textSecondary }]}
+                  style={[
+                    design.type.caption,
+                    { color: colors.textSecondary, marginTop: 4 },
+                  ]}
                 >
                   Name it something memorable.
                 </Text>
@@ -222,6 +264,7 @@ export default function AddToPlaylistSheet({ visible, song, onClose }: Props) {
                     backgroundColor: colors.surfaceElevated,
                     color: colors.text,
                     borderColor: colors.border,
+                    borderRadius: design.radius.item,
                   },
                 ]}
                 maxLength={60}
@@ -235,9 +278,15 @@ export default function AddToPlaylistSheet({ visible, song, onClose }: Props) {
                     setCreateOpen(false);
                     setNewName('');
                   }}
-                  style={[styles.actionBtn, { backgroundColor: colors.chipBg }]}
+                  style={[
+                    styles.actionBtn,
+                    {
+                      backgroundColor: colors.chipBg,
+                      borderRadius: design.radius.item,
+                    },
+                  ]}
                 >
-                  <Text style={[styles.actionText, { color: colors.text }]}>
+                  <Text style={[design.type.body, { color: colors.text }]}>
                     Back
                   </Text>
                 </Pressable>
@@ -246,7 +295,10 @@ export default function AddToPlaylistSheet({ visible, song, onClose }: Props) {
                   disabled={!newName.trim() || busy}
                   style={[
                     styles.actionBtn,
-                    { backgroundColor: colors.primary },
+                    {
+                      backgroundColor: colors.primary,
+                      borderRadius: design.radius.item,
+                    },
                     (!newName.trim() || busy) && { opacity: 0.5 },
                   ]}
                 >
@@ -255,7 +307,7 @@ export default function AddToPlaylistSheet({ visible, song, onClose }: Props) {
                   ) : (
                     <Text
                       style={[
-                        styles.actionText,
+                        design.type.body,
                         { color: colors.primaryText },
                       ]}
                     >
@@ -291,8 +343,6 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 14,
   },
-  title: { fontSize: 18, fontWeight: '800' },
-  subtitle: { fontSize: 13, marginTop: 4 },
 
   row: {
     flexDirection: 'row',
@@ -304,26 +354,20 @@ const styles = StyleSheet.create({
   rowIcon: {
     width: 32,
     height: 32,
-    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rowLabel: { flex: 1, fontSize: 15, fontWeight: '600' },
-  rowMeta: { fontSize: 12, marginTop: 2 },
 
   empty: { padding: 24, alignItems: 'center' },
-  emptyText: { fontSize: 13, textAlign: 'center' },
 
   cancel: {
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingVertical: 14,
     alignItems: 'center',
   },
-  cancelText: { fontSize: 14, fontWeight: '600' },
 
   input: {
     marginHorizontal: 20,
-    borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -339,8 +383,6 @@ const styles = StyleSheet.create({
   actionBtn: {
     flex: 1,
     paddingVertical: 13,
-    borderRadius: 12,
     alignItems: 'center',
   },
-  actionText: { fontSize: 14, fontWeight: '700' },
 });

@@ -25,6 +25,7 @@ import ProfileAvatar from '../../components/ProfileAvatar';
 import MiniPlayer from '../../components/MiniPlayer';
 
 type Colors = ReturnType<typeof useTheme>['colors'];
+type Design = ReturnType<typeof useTheme>['design'];
 type IconName = React.ComponentProps<typeof Feather>['name'];
 
 type EditField = 'name' | 'username' | 'bio' | null;
@@ -33,7 +34,7 @@ export default function ProfileScreen() {
   const { profile, loaded, update, reset } = useProfile();
   const { playlists } = usePlaylists();
   const { songs } = useLibrary();
-  const { colors } = useTheme();
+  const { colors, design } = useTheme();
 
   const [editField, setEditField] = useState<EditField>(null);
   const [draft, setDraft] = useState('');
@@ -85,11 +86,11 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Header card ──────────────────────────────── */}
         <View
           style={[
+            design.card,
             styles.headerCard,
-            { backgroundColor: colors.surface, borderColor: colors.border },
+            { backgroundColor: colors.surface },
           ]}
         >
           <ProfileAvatar
@@ -99,14 +100,35 @@ export default function ProfileScreen() {
             fontSize={38}
           />
 
-          <Text style={[styles.name, { color: colors.text }]}>
+          <Text
+            style={[
+              design.type.title,
+              { color: colors.text, marginTop: 16, textAlign: 'center' },
+            ]}
+          >
             {profile.name}
           </Text>
-          <Text style={[styles.username, { color: colors.textSecondary }]}>
+          <Text
+            style={[
+              design.type.caption,
+              { color: colors.textSecondary, marginTop: 2 },
+            ]}
+          >
             @{profile.username}
           </Text>
           {profile.bio ? (
-            <Text style={[styles.bio, { color: colors.textMuted }]}>
+            <Text
+              style={[
+                design.type.caption,
+                {
+                  color: colors.textMuted,
+                  marginTop: 10,
+                  textAlign: 'center',
+                  paddingHorizontal: 16,
+                  lineHeight: 19,
+                },
+              ]}
+            >
               {profile.bio}
             </Text>
           ) : null}
@@ -115,19 +137,26 @@ export default function ProfileScreen() {
             onPress={() => openEdit('name')}
             style={({ pressed }) => [
               styles.editBtn,
-              { backgroundColor: colors.primary },
+              {
+                backgroundColor: colors.primary,
+                borderRadius: design.radius.pill,
+              },
               pressed && { opacity: 0.9 },
             ]}
           >
             <Feather name="edit-2" size={14} color={colors.primaryText} />
-            <Text style={[styles.editBtnText, { color: colors.primaryText }]}>
+            <Text
+              style={[
+                design.type.caption,
+                { color: colors.primaryText, fontWeight: '700' },
+              ]}
+            >
               Edit profile
             </Text>
           </Pressable>
         </View>
 
-        {/* ── Avatar color ─────────────────────────────── */}
-        <Section title="Avatar color" colors={colors}>
+        <Section title="Avatar color" colors={colors} design={design}>
           <View style={styles.colorRow}>
             {AVATAR_COLORS.map((c) => {
               const active = profile.avatarColor === c;
@@ -144,23 +173,21 @@ export default function ProfileScreen() {
                     },
                   ]}
                 >
-                  {active && (
-                    <Feather name="check" size={16} color="#fff" />
-                  )}
+                  {active && <Feather name="check" size={16} color="#fff" />}
                 </Pressable>
               );
             })}
           </View>
         </Section>
 
-        {/* ── Statistics ───────────────────────────────── */}
-        <Section title="Your library" colors={colors}>
+        <Section title="Your library" colors={colors} design={design}>
           <View style={styles.statsRow}>
             <Stat
               icon="music"
               value={totalTracks}
               label={totalTracks === 1 ? 'Track' : 'Tracks'}
               colors={colors}
+              design={design}
             />
             <View
               style={[styles.statDivider, { backgroundColor: colors.border }]}
@@ -170,18 +197,19 @@ export default function ProfileScreen() {
               value={totalPlaylists}
               label={totalPlaylists === 1 ? 'Playlist' : 'Playlists'}
               colors={colors}
+              design={design}
             />
           </View>
         </Section>
 
-        {/* ── Edit fields ──────────────────────────────── */}
-        <Section title="Account" colors={colors}>
+        <Section title="Account" colors={colors} design={design}>
           <FieldRow
             icon="user"
             label="Display name"
             value={profile.name}
             onPress={() => openEdit('name')}
             colors={colors}
+            design={design}
           />
           <FieldRow
             icon="at-sign"
@@ -189,6 +217,7 @@ export default function ProfileScreen() {
             value={`@${profile.username}`}
             onPress={() => openEdit('username')}
             colors={colors}
+            design={design}
           />
           <FieldRow
             icon="align-left"
@@ -196,17 +225,18 @@ export default function ProfileScreen() {
             value={profile.bio || 'Add a short bio'}
             onPress={() => openEdit('bio')}
             colors={colors}
+            design={design}
             last
           />
         </Section>
 
-        {/* ── Actions ──────────────────────────────────── */}
-        <Section title="More" colors={colors}>
+        <Section title="More" colors={colors} design={design}>
           <ActionRow
             icon="settings"
             label="Settings"
             onPress={() => router.push('/settings')}
             colors={colors}
+            design={design}
           />
           <ActionRow
             icon="rotate-ccw"
@@ -214,11 +244,21 @@ export default function ProfileScreen() {
             destructive
             onPress={confirmReset}
             colors={colors}
+            design={design}
             last
           />
         </Section>
 
-        <Text style={[styles.footer, { color: colors.textMuted }]}>
+        <Text
+          style={[
+            design.type.caption,
+            {
+              color: colors.textMuted,
+              textAlign: 'center',
+              marginTop: 32,
+            },
+          ]}
+        >
           Joined{' '}
           {new Date(profile.joinedAt).toLocaleDateString(undefined, {
             month: 'long',
@@ -227,7 +267,6 @@ export default function ProfileScreen() {
         </Text>
       </ScrollView>
 
-      {/* ── Edit modal ─────────────────────────────────── */}
       <Modal
         visible={!!editField}
         transparent
@@ -243,9 +282,18 @@ export default function ProfileScreen() {
             onPress={() => setEditField(null)}
           />
           <View
-            style={[styles.modalCard, { backgroundColor: colors.surface }]}
+            style={[
+              design.card,
+              styles.modalCard,
+              { backgroundColor: colors.surface },
+            ]}
           >
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
+            <Text
+              style={[
+                design.type.heading,
+                { color: colors.text, marginBottom: 12 },
+              ]}
+            >
               {editField === 'name' && 'Display name'}
               {editField === 'username' && 'Username'}
               {editField === 'bio' && 'Bio'}
@@ -269,8 +317,12 @@ export default function ProfileScreen() {
                   backgroundColor: colors.surfaceElevated,
                   color: colors.text,
                   borderColor: colors.border,
+                  borderRadius: design.radius.item,
                 },
-                editField === 'bio' && { minHeight: 90, textAlignVertical: 'top' },
+                editField === 'bio' && {
+                  minHeight: 90,
+                  textAlignVertical: 'top',
+                },
               ]}
               maxLength={editField === 'bio' ? 140 : 40}
               multiline={editField === 'bio'}
@@ -281,18 +333,30 @@ export default function ProfileScreen() {
             <View style={styles.modalActions}>
               <Pressable
                 onPress={() => setEditField(null)}
-                style={[styles.modalBtn, { backgroundColor: colors.chipBg }]}
+                style={[
+                  styles.modalBtn,
+                  {
+                    backgroundColor: colors.chipBg,
+                    borderRadius: design.radius.item,
+                  },
+                ]}
               >
-                <Text style={[styles.modalBtnText, { color: colors.text }]}>
+                <Text style={[design.type.body, { color: colors.text }]}>
                   Cancel
                 </Text>
               </Pressable>
               <Pressable
                 onPress={submitEdit}
-                style={[styles.modalBtn, { backgroundColor: colors.primary }]}
+                style={[
+                  styles.modalBtn,
+                  {
+                    backgroundColor: colors.primary,
+                    borderRadius: design.radius.item,
+                  },
+                ]}
               >
                 <Text
-                  style={[styles.modalBtnText, { color: colors.primaryText }]}
+                  style={[design.type.body, { color: colors.primaryText }]}
                 >
                   Save
                 </Text>
@@ -307,26 +371,32 @@ export default function ProfileScreen() {
   );
 }
 
-// ── Building blocks ──────────────────────────────────────
-
 function Section({
   title,
   colors,
+  design,
   children,
 }: {
   title: string;
   colors: Colors;
+  design: Design;
   children: React.ReactNode;
 }) {
   return (
-    <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
-        {title.toUpperCase()}
+    <View style={[styles.section, { marginTop: design.spacing.section }]}>
+      <Text
+        style={[
+          design.type.sectionLabel,
+          { color: colors.textMuted, marginHorizontal: 20, marginBottom: 8 },
+        ]}
+      >
+        {title}
       </Text>
       <View
         style={[
+          design.card,
           styles.card,
-          { backgroundColor: colors.surface, borderColor: colors.border },
+          { backgroundColor: colors.surface },
         ]}
       >
         {children}
@@ -340,21 +410,26 @@ function Stat({
   value,
   label,
   colors,
+  design,
 }: {
   icon: IconName;
   value: number;
   label: string;
   colors: Colors;
+  design: Design;
 }) {
   return (
     <View style={styles.stat}>
       <View
-        style={[styles.statIcon, { backgroundColor: colors.rowActive }]}
+        style={[
+          styles.statIcon,
+          { backgroundColor: colors.rowActive },
+        ]}
       >
         <Feather name={icon} size={20} color={colors.primary} />
       </View>
-      <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
-      <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+      <Text style={[design.type.title, { color: colors.text }]}>{value}</Text>
+      <Text style={[design.type.caption, { color: colors.textMuted }]}>
         {label}
       </Text>
     </View>
@@ -367,6 +442,7 @@ function FieldRow({
   value,
   onPress,
   colors,
+  design,
   last,
 }: {
   icon: IconName;
@@ -374,6 +450,7 @@ function FieldRow({
   value: string;
   onPress: () => void;
   colors: Colors;
+  design: Design;
   last?: boolean;
 }) {
   return (
@@ -381,23 +458,35 @@ function FieldRow({
       onPress={onPress}
       style={({ pressed }) => [
         styles.row,
-        !last && {
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: colors.borderSubtle,
-        },
+        !last &&
+          design.showRowDividers && {
+            borderBottomWidth: StyleSheet.hairlineWidth,
+            borderBottomColor: colors.borderSubtle,
+          },
         pressed && { backgroundColor: colors.surfaceElevated },
       ]}
     >
-      <View style={[styles.rowIcon, { backgroundColor: colors.rowActive }]}>
+      <View
+        style={[
+          styles.rowIcon,
+          {
+            backgroundColor: colors.rowActive,
+            borderRadius: design.radius.item - 2,
+          },
+        ]}
+      >
         <Feather name={icon} size={16} color={colors.primary} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={[styles.rowLabel, { color: colors.textMuted }]}>
+        <Text style={[design.type.caption, { color: colors.textMuted }]}>
           {label}
         </Text>
         <Text
           numberOfLines={1}
-          style={[styles.rowValue, { color: colors.text }]}
+          style={[
+            design.type.body,
+            { color: colors.text, marginTop: 2, fontWeight: '600' },
+          ]}
         >
           {value}
         </Text>
@@ -413,6 +502,7 @@ function ActionRow({
   onPress,
   destructive,
   colors,
+  design,
   last,
 }: {
   icon: IconName;
@@ -420,6 +510,7 @@ function ActionRow({
   onPress: () => void;
   destructive?: boolean;
   colors: Colors;
+  design: Design;
   last?: boolean;
 }) {
   return (
@@ -427,10 +518,11 @@ function ActionRow({
       onPress={onPress}
       style={({ pressed }) => [
         styles.row,
-        !last && {
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: colors.borderSubtle,
-        },
+        !last &&
+          design.showRowDividers && {
+            borderBottomWidth: StyleSheet.hairlineWidth,
+            borderBottomColor: colors.borderSubtle,
+          },
         pressed && { backgroundColor: colors.surfaceElevated },
       ]}
     >
@@ -441,6 +533,7 @@ function ActionRow({
             backgroundColor: destructive
               ? 'rgba(239,68,68,0.12)'
               : colors.rowActive,
+            borderRadius: design.radius.item - 2,
           },
         ]}
       >
@@ -452,8 +545,12 @@ function ActionRow({
       </View>
       <Text
         style={[
-          styles.rowLabel,
-          { flex: 1, color: destructive ? colors.danger : colors.text },
+          design.type.body,
+          {
+            flex: 1,
+            color: destructive ? colors.danger : colors.text,
+            fontWeight: '600',
+          },
         ]}
       >
         {label}
@@ -471,23 +568,7 @@ const styles = StyleSheet.create({
   headerCard: {
     marginHorizontal: 16,
     padding: 24,
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
-  },
-  name: {
-    fontSize: 22,
-    fontWeight: '800',
-    marginTop: 16,
-    textAlign: 'center',
-  },
-  username: { fontSize: 14, marginTop: 2 },
-  bio: {
-    fontSize: 13,
-    marginTop: 10,
-    textAlign: 'center',
-    paddingHorizontal: 16,
-    lineHeight: 19,
   },
   editBtn: {
     flexDirection: 'row',
@@ -496,23 +577,12 @@ const styles = StyleSheet.create({
     marginTop: 18,
     paddingHorizontal: 18,
     paddingVertical: 9,
-    borderRadius: 20,
   },
-  editBtnText: { fontSize: 13, fontWeight: '700' },
 
-  section: { marginTop: 22 },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    marginHorizontal: 20,
-    marginBottom: 8,
-  },
+  section: {},
   card: {
     marginHorizontal: 16,
-    borderRadius: 14,
     overflow: 'hidden',
-    borderWidth: StyleSheet.hairlineWidth,
   },
 
   colorRow: {
@@ -543,8 +613,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  statValue: { fontSize: 22, fontWeight: '800' },
-  statLabel: { fontSize: 12, fontWeight: '500' },
   statDivider: {
     width: StyleSheet.hairlineWidth,
     height: 60,
@@ -561,17 +629,8 @@ const styles = StyleSheet.create({
   rowIcon: {
     width: 32,
     height: 32,
-    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  rowLabel: { fontSize: 15, fontWeight: '600' },
-  rowValue: { fontSize: 13, marginTop: 2 },
-
-  footer: {
-    textAlign: 'center',
-    fontSize: 12,
-    marginTop: 32,
   },
 
   modalOverlay: {
@@ -586,12 +645,9 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '86%',
     maxWidth: 420,
-    borderRadius: 18,
     padding: 22,
   },
-  modalTitle: { fontSize: 19, fontWeight: '800', marginBottom: 12 },
   modalInput: {
-    borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -601,8 +657,6 @@ const styles = StyleSheet.create({
   modalBtn: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 12,
     alignItems: 'center',
   },
-  modalBtnText: { fontSize: 14, fontWeight: '700' },
 });

@@ -20,7 +20,7 @@ const NAV_ITEMS = [
 export default function CustomDrawerContent(
   props: DrawerContentComponentProps
 ) {
-  const { colors } = useTheme();
+  const { colors, design } = useTheme();
   const { profile } = useProfile();
   const activeRoute = props.state.routeNames[props.state.index];
 
@@ -34,7 +34,7 @@ export default function CustomDrawerContent(
       style={[styles.root, { backgroundColor: colors.surface }]}
       edges={['top', 'bottom']}
     >
-      {/* ── Profile header ──────────────────────────── */}
+      {/* Profile header */}
       <Pressable
         onPress={goToProfile}
         style={({ pressed }) => [
@@ -50,22 +50,24 @@ export default function CustomDrawerContent(
         <View style={{ flex: 1 }}>
           <Text
             numberOfLines={1}
-            style={[styles.profileName, { color: colors.text }]}
+            style={[
+              design.type.body,
+              { color: colors.text, fontWeight: '700' },
+            ]}
           >
             {profile.name}
           </Text>
           <Text
             numberOfLines={1}
-            style={[styles.profileUsername, { color: colors.textMuted }]}
+            style={[
+              design.type.caption,
+              { color: colors.textMuted, marginTop: 2 },
+            ]}
           >
             @{profile.username}
           </Text>
         </View>
-        <Feather
-          name="chevron-right"
-          size={20}
-          color={colors.textMuted}
-        />
+        <Feather name="chevron-right" size={20} color={colors.textMuted} />
       </Pressable>
 
       <View style={[styles.divider, { backgroundColor: colors.border }]} />
@@ -86,6 +88,10 @@ export default function CustomDrawerContent(
               }}
               style={({ pressed }) => [
                 styles.row,
+                {
+                  borderRadius: design.radius.item,
+                  marginBottom: design.spacing.item - 10,
+                },
                 active && { backgroundColor: colors.rowActive },
                 pressed && { opacity: 0.6 },
               ]}
@@ -97,7 +103,7 @@ export default function CustomDrawerContent(
               />
               <Text
                 style={[
-                  styles.rowLabel,
+                  design.type.body,
                   { color: active ? colors.primary : colors.textSecondary },
                   active && { fontWeight: '700' },
                 ]}
@@ -115,7 +121,16 @@ export default function CustomDrawerContent(
 
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
-        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
+        <Text
+          style={[
+            design.type.sectionLabel,
+            {
+              color: colors.textMuted,
+              paddingHorizontal: 12,
+              marginBottom: 8,
+            },
+          ]}
+        >
           PLAYLISTS
         </Text>
 
@@ -124,12 +139,16 @@ export default function CustomDrawerContent(
             key={name}
             style={({ pressed }) => [
               styles.playlistRow,
+              { borderRadius: design.radius.item - 2 },
               pressed && { opacity: 0.6 },
             ]}
           >
             <Feather name="folder" size={16} color={colors.iconMuted} />
             <Text
-              style={[styles.playlistLabel, { color: colors.textSecondary }]}
+              style={[
+                design.type.caption,
+                { color: colors.textSecondary },
+              ]}
             >
               {name}
             </Text>
@@ -138,7 +157,12 @@ export default function CustomDrawerContent(
       </ScrollView>
 
       <View style={[styles.footer, { borderTopColor: colors.border }]}>
-        <Text style={[styles.footerText, { color: colors.textMuted }]}>
+        <Text
+          style={[
+            design.type.caption,
+            { color: colors.textMuted, fontSize: 11 },
+          ]}
+        >
           v1.0.0
         </Text>
       </View>
@@ -157,8 +181,6 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 16,
   },
-  profileName: { fontSize: 16, fontWeight: '700' },
-  profileUsername: { fontSize: 12, marginTop: 2 },
 
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 12, paddingBottom: 12 },
@@ -169,23 +191,13 @@ const styles = StyleSheet.create({
     gap: 14,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    borderRadius: 10,
-    marginBottom: 2,
   },
-  rowLabel: { flex: 1, fontSize: 15, fontWeight: '500' },
   activeDot: { width: 6, height: 6, borderRadius: 3 },
 
   divider: {
     height: StyleSheet.hairlineWidth,
     marginVertical: 12,
     marginHorizontal: 12,
-  },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    paddingHorizontal: 12,
-    marginBottom: 8,
   },
 
   playlistRow: {
@@ -194,14 +206,11 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderRadius: 8,
   },
-  playlistLabel: { fontSize: 14 },
 
   footer: {
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  footerText: { fontSize: 11 },
 });
