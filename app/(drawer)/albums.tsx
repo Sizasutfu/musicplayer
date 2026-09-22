@@ -26,7 +26,7 @@ const TILE_SIZE =
 
 export default function AlbumsScreen() {
   const { songs, loading } = useLibrary();
-  const { colors } = useTheme();
+  const { colors, design } = useTheme();
 
   const albums = useMemo(() => groupByAlbum(songs), [songs]);
 
@@ -34,7 +34,7 @@ export default function AlbumsScreen() {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
         <ActivityIndicator color={colors.primary} />
-        <Text style={[styles.mutedText, { color: colors.textSecondary }]}>
+        <Text style={[design.type.caption, { color: colors.textSecondary }]}>
           Loading albums…
         </Text>
       </View>
@@ -45,10 +45,12 @@ export default function AlbumsScreen() {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
         <Feather name="disc" size={42} color={colors.iconMuted} />
-        <Text style={[styles.msgTitle, { color: colors.text }]}>
+        <Text
+          style={[design.type.heading, { color: colors.text, marginTop: 4 }]}
+        >
           No albums yet
         </Text>
-        <Text style={[styles.mutedText, { color: colors.textSecondary }]}>
+        <Text style={[design.type.caption, { color: colors.textSecondary }]}>
           Albums appear once your tracks have metadata.
         </Text>
       </View>
@@ -61,14 +63,24 @@ export default function AlbumsScreen() {
         data={albums}
         keyExtractor={(item) => item.key}
         numColumns={NUM_COLS}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          { gap: design.spacing.item - 2 },
+        ]}
         columnWrapperStyle={{ gap: GAP }}
         showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => (
-          <AlbumTile album={item} colors={colors} />
-        )}
+        renderItem={({ item }) => <AlbumTile album={item} />}
         ListHeaderComponent={
-          <Text style={[styles.subheading, { color: colors.textMuted }]}>
+          <Text
+            style={[
+              design.type.caption,
+              {
+                color: colors.textMuted,
+                marginBottom: design.spacing.item - 4,
+                marginTop: 4,
+              },
+            ]}
+          >
             {albums.length} {albums.length === 1 ? 'album' : 'albums'}
           </Text>
         }
@@ -78,7 +90,9 @@ export default function AlbumsScreen() {
   );
 }
 
-function AlbumTile({ album, colors }: { album: Album; colors: any }) {
+function AlbumTile({ album }: { album: Album }) {
+  const { colors, design } = useTheme();
+
   return (
     <Pressable
       style={({ pressed }) => [styles.tile, pressed && { opacity: 0.7 }]}
@@ -90,13 +104,20 @@ function AlbumTile({ album, colors }: { album: Album; colors: any }) {
       }
     >
       {album.artwork ? (
-        <Image source={{ uri: album.artwork }} style={styles.art} />
+        <Image
+          source={{ uri: album.artwork }}
+          style={[styles.art, { borderRadius: design.radius.item + 2 }]}
+        />
       ) : (
         <View
           style={[
             styles.art,
-            styles.artPlaceholder,
-            { backgroundColor: colors.artPlaceholder },
+            {
+              borderRadius: design.radius.item + 2,
+              backgroundColor: colors.artPlaceholder,
+              alignItems: 'center',
+              justifyContent: 'center',
+            },
           ]}
         >
           <Feather name="disc" size={36} color={colors.iconMuted} />
@@ -104,17 +125,26 @@ function AlbumTile({ album, colors }: { album: Album; colors: any }) {
       )}
       <Text
         numberOfLines={1}
-        style={[styles.title, { color: colors.text }]}
+        style={[
+          design.type.body,
+          {
+            color: colors.text,
+            fontWeight: '700',
+            marginTop: 8,
+          },
+        ]}
       >
         {album.title}
       </Text>
       <Text
         numberOfLines={1}
-        style={[styles.artist, { color: colors.textSecondary }]}
+        style={[design.type.caption, { color: colors.textSecondary, marginTop: 2 }]}
       >
         {album.artist}
       </Text>
-      <Text style={[styles.count, { color: colors.textMuted }]}>
+      <Text
+        style={[design.type.caption, { color: colors.textMuted, marginTop: 2 }]}
+      >
         {album.songs.length} {album.songs.length === 1 ? 'track' : 'tracks'}
       </Text>
     </Pressable>
@@ -123,7 +153,6 @@ function AlbumTile({ album, colors }: { album: Album; colors: any }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-
   center: {
     flex: 1,
     alignItems: 'center',
@@ -131,43 +160,11 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 8,
   },
-  msgTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    marginTop: 4,
-  },
-  mutedText: { fontSize: 14, textAlign: 'center' },
-
   listContent: {
     paddingHorizontal: H_PADDING,
     paddingTop: 8,
     paddingBottom: 160,
-    gap: GAP,
   },
-  subheading: {
-    fontSize: 13,
-    marginBottom: 8,
-    marginTop: 4,
-  },
-
-  tile: {
-    width: TILE_SIZE,
-    marginBottom: GAP,
-  },
-  art: {
-    width: TILE_SIZE,
-    height: TILE_SIZE,
-    borderRadius: 10,
-  },
-  artPlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginTop: 8,
-  },
-  artist: { fontSize: 12, marginTop: 2 },
-  count: { fontSize: 11, marginTop: 2 },
+  tile: { width: TILE_SIZE },
+  art: { width: TILE_SIZE, height: TILE_SIZE },
 });

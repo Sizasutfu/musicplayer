@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePlaylists } from '../../hooks/usePlaylists';
 import { useLibrary } from '../../hooks/useLibrary';
 import { useTheme } from '../../context/ThemeContext';
@@ -23,16 +24,11 @@ import MiniPlayer from '../../components/MiniPlayer';
 export default function PlaylistsScreen() {
   const { playlists, loaded, create, remove } = usePlaylists();
   const { songs } = useLibrary();
-  const { colors } = useTheme();
+  const { colors, design } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState('');
-
-  const songByUri = React.useMemo(() => {
-    const map = new Map<string, any>();
-    for (const s of songs) map.set(s.url, s);
-    return map;
-  }, [songs]);
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
@@ -51,11 +47,7 @@ export default function PlaylistsScreen() {
       `"${name}" will be removed. Your music files are not affected.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => remove(id),
-        },
+        { text: 'Delete', style: 'destructive', onPress: () => remove(id) },
       ]
     );
   };
@@ -77,7 +69,15 @@ export default function PlaylistsScreen() {
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           playlists.length > 0 ? (
-            <Text style={[styles.subheading, { color: colors.textMuted }]}>
+            <Text
+              style={[
+                design.type.caption,
+                {
+                  color: colors.textMuted,
+                  marginBottom: design.spacing.item - 4,
+                },
+              ]}
+            >
               {playlists.length}{' '}
               {playlists.length === 1 ? 'playlist' : 'playlists'}
             </Text>
@@ -97,13 +97,21 @@ export default function PlaylistsScreen() {
               delayLongPress={400}
               style={({ pressed }) => [
                 styles.row,
+                {
+                  paddingVertical: design.row.paddingVertical + 2,
+                  borderBottomWidth: design.row.borderBottomWidth,
+                  borderBottomColor: design.row.borderBottomColor,
+                },
                 pressed && { backgroundColor: colors.surfaceElevated },
               ]}
             >
               <View
                 style={[
                   styles.iconWrap,
-                  { backgroundColor: colors.rowActive },
+                  {
+                    backgroundColor: colors.rowActive,
+                    borderRadius: design.radius.item,
+                  },
                 ]}
               >
                 <Feather name="list" size={22} color={colors.primary} />
@@ -112,13 +120,19 @@ export default function PlaylistsScreen() {
               <View style={{ flex: 1 }}>
                 <Text
                   numberOfLines={1}
-                  style={[styles.name, { color: colors.text }]}
+                  style={[
+                    design.type.body,
+                    { color: colors.text, fontWeight: '600' },
+                  ]}
                 >
                   {item.name}
                 </Text>
                 <Text
                   numberOfLines={1}
-                  style={[styles.meta, { color: colors.textSecondary }]}
+                  style={[
+                    design.type.caption,
+                    { color: colors.textSecondary, marginTop: 2 },
+                  ]}
                 >
                   {trackCount} {trackCount === 1 ? 'track' : 'tracks'}
                 </Text>
@@ -135,29 +149,37 @@ export default function PlaylistsScreen() {
         ListEmptyComponent={
           <View style={styles.center}>
             <Feather name="list" size={42} color={colors.iconMuted} />
-            <Text style={[styles.msgTitle, { color: colors.text }]}>
+            <Text
+              style={[
+                design.type.heading,
+                { color: colors.text, marginTop: 4 },
+              ]}
+            >
               No playlists yet
             </Text>
-            <Text style={[styles.mutedText, { color: colors.textSecondary }]}>
+            <Text style={[design.type.caption, { color: colors.textSecondary }]}>
               Create one to group your favourite tracks.
             </Text>
           </View>
         }
       />
 
-      {/* Floating create button */}
+      {/* FAB */}
       <Pressable
         onPress={() => setCreateOpen(true)}
         style={({ pressed }) => [
           styles.fab,
-          { backgroundColor: colors.primary },
+          {
+            backgroundColor: colors.primary,
+            bottom: insets.bottom + 100,
+            shadowColor: colors.fabShadow,
+          },
           pressed && { opacity: 0.9, transform: [{ scale: 0.96 }] },
         ]}
       >
         <Feather name="plus" size={24} color={colors.primaryText} />
       </Pressable>
 
-      {/* Create modal */}
       <Modal
         visible={createOpen}
         transparent
@@ -173,13 +195,20 @@ export default function PlaylistsScreen() {
             onPress={() => setCreateOpen(false)}
           />
           <View
-            style={[styles.modalCard, { backgroundColor: colors.surface }]}
+            style={[
+              design.card,
+              styles.modalCard,
+              { backgroundColor: colors.surface },
+            ]}
           >
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
+            <Text style={[design.type.heading, { color: colors.text }]}>
               New Playlist
             </Text>
             <Text
-              style={[styles.modalSubtitle, { color: colors.textSecondary }]}
+              style={[
+                design.type.caption,
+                { color: colors.textSecondary, marginTop: 4, marginBottom: 16 },
+              ]}
             >
               Give it a name to get started.
             </Text>
@@ -195,6 +224,7 @@ export default function PlaylistsScreen() {
                   backgroundColor: colors.surfaceElevated,
                   color: colors.text,
                   borderColor: colors.border,
+                  borderRadius: design.radius.item,
                 },
               ]}
               maxLength={60}
@@ -207,9 +237,15 @@ export default function PlaylistsScreen() {
                   setCreateOpen(false);
                   setNewName('');
                 }}
-                style={[styles.modalBtn, { backgroundColor: colors.chipBg }]}
+                style={[
+                  styles.modalBtn,
+                  {
+                    backgroundColor: colors.chipBg,
+                    borderRadius: design.radius.item,
+                  },
+                ]}
               >
-                <Text style={[styles.modalBtnText, { color: colors.text }]}>
+                <Text style={[design.type.body, { color: colors.text }]}>
                   Cancel
                 </Text>
               </Pressable>
@@ -218,12 +254,15 @@ export default function PlaylistsScreen() {
                 disabled={!newName.trim()}
                 style={[
                   styles.modalBtn,
-                  { backgroundColor: colors.primary },
+                  {
+                    backgroundColor: colors.primary,
+                    borderRadius: design.radius.item,
+                  },
                   !newName.trim() && { opacity: 0.5 },
                 ]}
               >
                 <Text
-                  style={[styles.modalBtnText, { color: colors.primaryText }]}
+                  style={[design.type.body, { color: colors.primaryText }]}
                 >
                   Create
                 </Text>
@@ -247,49 +286,32 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 8,
   },
-  msgTitle: { fontSize: 17, fontWeight: '700', marginTop: 4 },
-  mutedText: { fontSize: 14, textAlign: 'center' },
-
   listContent: { paddingTop: 8, paddingBottom: 160 },
-  subheading: {
-    fontSize: 13,
-    paddingHorizontal: 20,
-    paddingBottom: 8,
-  },
-
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
     paddingHorizontal: 20,
-    paddingVertical: 14,
   },
   iconWrap: {
     width: 48,
     height: 48,
-    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  name: { fontSize: 15, fontWeight: '600' },
-  meta: { fontSize: 12, marginTop: 2 },
-
   fab: {
     position: 'absolute',
     right: 20,
-    bottom: 100,
     width: 56,
     height: 56,
     borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
     shadowOpacity: 0.25,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
     elevation: 6,
   },
-
   modalOverlay: {
     flex: 1,
     alignItems: 'center',
@@ -302,28 +324,18 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '86%',
     maxWidth: 420,
-    borderRadius: 18,
     padding: 22,
   },
-  modalTitle: { fontSize: 19, fontWeight: '800' },
-  modalSubtitle: { fontSize: 13, marginTop: 4, marginBottom: 16 },
   modalInput: {
-    borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
   },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 18,
-  },
+  modalActions: { flexDirection: 'row', gap: 10, marginTop: 18 },
   modalBtn: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 12,
     alignItems: 'center',
   },
-  modalBtnText: { fontSize: 14, fontWeight: '700' },
 });

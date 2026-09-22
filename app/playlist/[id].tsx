@@ -36,7 +36,7 @@ export default function PlaylistDetailScreen() {
   const { playlists, remove, rename, removeTrack } = usePlaylists();
   const { songs, loading: libraryLoading } = useLibrary();
   const { playQueue, currentTrack, isPlaying } = usePlayer();
-  const { colors } = useTheme();
+  const { colors, design } = useTheme();
 
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameText, setRenameText] = useState('');
@@ -113,10 +113,15 @@ export default function PlaylistDetailScreen() {
           <View style={styles.iconBtn} />
         </View>
         <View style={styles.center}>
-          <Text style={[styles.msgTitle, { color: colors.text }]}>
+          <Text style={[design.type.heading, { color: colors.text }]}>
             Playlist not found
           </Text>
-          <Text style={[styles.mutedText, { color: colors.textSecondary }]}>
+          <Text
+            style={[
+              design.type.caption,
+              { color: colors.textSecondary, marginTop: 4 },
+            ]}
+          >
             It may have been deleted.
           </Text>
         </View>
@@ -140,7 +145,10 @@ export default function PlaylistDetailScreen() {
           <Feather name="chevron-left" size={26} color={colors.icon} />
         </Pressable>
         <Text
-          style={[styles.topBarTitle, { color: colors.text }]}
+          style={[
+            design.type.caption,
+            { color: colors.text, fontWeight: '700' },
+          ]}
           numberOfLines={1}
         >
           Playlist
@@ -160,7 +168,10 @@ export default function PlaylistDetailScreen() {
             <View
               style={[
                 styles.cover,
-                { backgroundColor: colors.artPlaceholder },
+                {
+                  backgroundColor: colors.artPlaceholder,
+                  borderRadius: design.radius.card + 4,
+                },
               ]}
             >
               <Feather name="list" size={56} color={colors.iconMuted} />
@@ -168,11 +179,19 @@ export default function PlaylistDetailScreen() {
 
             <Text
               numberOfLines={2}
-              style={[styles.title, { color: colors.text }]}
+              style={[
+                design.type.title,
+                { color: colors.text, textAlign: 'center' },
+              ]}
             >
               {playlist.name}
             </Text>
-            <Text style={[styles.metaLine, { color: colors.textMuted }]}>
+            <Text
+              style={[
+                design.type.caption,
+                { color: colors.textMuted, marginTop: 4 },
+              ]}
+            >
               {tracks.length} {tracks.length === 1 ? 'track' : 'tracks'}
               {totalMin > 0 ? ` · ${totalMin} min` : ''}
             </Text>
@@ -183,14 +202,20 @@ export default function PlaylistDetailScreen() {
                 disabled={tracks.length === 0}
                 style={({ pressed }) => [
                   styles.playAllBtn,
-                  { backgroundColor: colors.primary },
+                  {
+                    backgroundColor: colors.primary,
+                    borderRadius: design.radius.pill,
+                  },
                   tracks.length === 0 && { opacity: 0.4 },
                   pressed && tracks.length > 0 && { opacity: 0.85 },
                 ]}
               >
                 <Feather name="play" size={18} color={colors.primaryText} />
                 <Text
-                  style={[styles.playAllText, { color: colors.primaryText }]}
+                  style={[
+                    design.type.body,
+                    { color: colors.primaryText, fontWeight: '700' },
+                  ]}
                 >
                   Play
                 </Text>
@@ -203,11 +228,17 @@ export default function PlaylistDetailScreen() {
                   {
                     borderColor: colors.border,
                     backgroundColor: colors.surface,
+                    borderRadius: design.radius.pill,
                   },
                 ]}
               >
                 <Feather name="trash-2" size={16} color={colors.danger} />
-                <Text style={[styles.secondaryText, { color: colors.danger }]}>
+                <Text
+                  style={[
+                    design.type.body,
+                    { color: colors.danger, fontWeight: '700' },
+                  ]}
+                >
                   Delete
                 </Text>
               </Pressable>
@@ -223,18 +254,33 @@ export default function PlaylistDetailScreen() {
               delayLongPress={400}
               style={({ pressed }) => [
                 styles.row,
+                {
+                  paddingVertical: design.row.paddingVertical,
+                  borderBottomWidth: design.row.borderBottomWidth,
+                  borderBottomColor: design.row.borderBottomColor,
+                },
                 active && { backgroundColor: colors.rowActive },
                 pressed && { opacity: 0.7 },
               ]}
             >
               {item.artwork ? (
-                <Image source={{ uri: item.artwork }} style={styles.art} />
+                <Image
+                  source={{ uri: item.artwork }}
+                  style={[
+                    styles.art,
+                    { borderRadius: design.radius.item },
+                  ]}
+                />
               ) : (
                 <View
                   style={[
                     styles.art,
-                    styles.artPlaceholder,
-                    { backgroundColor: colors.artPlaceholder },
+                    {
+                      borderRadius: design.radius.item,
+                      backgroundColor: colors.artPlaceholder,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    },
                     active && { backgroundColor: colors.primary },
                   ]}
                 >
@@ -250,8 +296,8 @@ export default function PlaylistDetailScreen() {
                 <Text
                   numberOfLines={1}
                   style={[
-                    styles.trackTitle,
-                    { color: colors.text },
+                    design.type.body,
+                    { color: colors.text, fontWeight: '600' },
                     active && { color: colors.primary },
                   ]}
                 >
@@ -259,7 +305,10 @@ export default function PlaylistDetailScreen() {
                 </Text>
                 <Text
                   numberOfLines={1}
-                  style={[styles.trackSub, { color: colors.textSecondary }]}
+                  style={[
+                    design.type.caption,
+                    { color: colors.textSecondary, marginTop: 2 },
+                  ]}
                 >
                   {item.artist}
                 </Text>
@@ -269,7 +318,16 @@ export default function PlaylistDetailScreen() {
                 <Feather name="volume-2" size={16} color={colors.primary} />
               )}
 
-              <Text style={[styles.duration, { color: colors.textMuted }]}>
+              <Text
+                style={[
+                  design.type.caption,
+                  {
+                    color: colors.textMuted,
+                    fontVariant: ['tabular-nums'],
+                    marginLeft: 8,
+                  },
+                ]}
+              >
                 {formatDuration(item.duration)}
               </Text>
             </Pressable>
@@ -283,10 +341,24 @@ export default function PlaylistDetailScreen() {
           ) : (
             <View style={styles.emptyWrap}>
               <Feather name="music" size={36} color={colors.iconMuted} />
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>
+              <Text
+                style={[
+                  design.type.heading,
+                  { color: colors.text, marginTop: 4 },
+                ]}
+              >
                 Empty playlist
               </Text>
-              <Text style={[styles.mutedText, { color: colors.textSecondary }]}>
+              <Text
+                style={[
+                  design.type.caption,
+                  {
+                    color: colors.textSecondary,
+                    textAlign: 'center',
+                    paddingHorizontal: 24,
+                  },
+                ]}
+              >
                 Long-press a song in your library to add it here.
               </Text>
             </View>
@@ -327,9 +399,18 @@ export default function PlaylistDetailScreen() {
             onPress={() => setRenameOpen(false)}
           />
           <View
-            style={[styles.modalCard, { backgroundColor: colors.surface }]}
+            style={[
+              design.card,
+              styles.modalCard,
+              { backgroundColor: colors.surface },
+            ]}
           >
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
+            <Text
+              style={[
+                design.type.heading,
+                { color: colors.text, marginBottom: 12 },
+              ]}
+            >
               Rename playlist
             </Text>
             <TextInput
@@ -344,6 +425,7 @@ export default function PlaylistDetailScreen() {
                   backgroundColor: colors.surfaceElevated,
                   color: colors.text,
                   borderColor: colors.border,
+                  borderRadius: design.radius.item,
                 },
               ]}
               maxLength={60}
@@ -353,9 +435,15 @@ export default function PlaylistDetailScreen() {
             <View style={styles.modalActions}>
               <Pressable
                 onPress={() => setRenameOpen(false)}
-                style={[styles.modalBtn, { backgroundColor: colors.chipBg }]}
+                style={[
+                  styles.modalBtn,
+                  {
+                    backgroundColor: colors.chipBg,
+                    borderRadius: design.radius.item,
+                  },
+                ]}
               >
-                <Text style={[styles.modalBtnText, { color: colors.text }]}>
+                <Text style={[design.type.body, { color: colors.text }]}>
                   Cancel
                 </Text>
               </Pressable>
@@ -364,12 +452,15 @@ export default function PlaylistDetailScreen() {
                 disabled={!renameText.trim()}
                 style={[
                   styles.modalBtn,
-                  { backgroundColor: colors.primary },
+                  {
+                    backgroundColor: colors.primary,
+                    borderRadius: design.radius.item,
+                  },
                   !renameText.trim() && { opacity: 0.5 },
                 ]}
               >
                 <Text
-                  style={[styles.modalBtnText, { color: colors.primaryText }]}
+                  style={[design.type.body, { color: colors.primaryText }]}
                 >
                   Save
                 </Text>
@@ -389,10 +480,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
-    gap: 8,
+    gap: 4,
   },
-  msgTitle: { fontSize: 17, fontWeight: '700' },
-  mutedText: { fontSize: 14, textAlign: 'center', paddingHorizontal: 24 },
 
   topBar: {
     flexDirection: 'row',
@@ -407,7 +496,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  topBarTitle: { fontSize: 14, fontWeight: '700' },
 
   headerBlock: {
     alignItems: 'center',
@@ -418,13 +506,10 @@ const styles = StyleSheet.create({
   cover: {
     width: 160,
     height: 160,
-    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
   },
-  title: { fontSize: 22, fontWeight: '800', textAlign: 'center' },
-  metaLine: { fontSize: 13, marginTop: 4 },
 
   headerActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
   playAllBtn: {
@@ -433,36 +518,23 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 24,
     paddingVertical: 11,
-    borderRadius: 26,
   },
-  playAllText: { fontWeight: '700', fontSize: 15 },
   secondaryBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 18,
     paddingVertical: 11,
-    borderRadius: 26,
     borderWidth: 1,
   },
-  secondaryText: { fontWeight: '700', fontSize: 14 },
 
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 20,
-    paddingVertical: 10,
   },
-  art: { width: 44, height: 44, borderRadius: 8 },
-  artPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  trackTitle: { fontSize: 15, fontWeight: '600' },
-  trackSub: { fontSize: 12, marginTop: 2 },
-  duration: {
-    fontSize: 12,
-    fontVariant: ['tabular-nums'],
-    marginLeft: 8,
-  },
+  art: { width: 44, height: 44 },
 
   emptyWrap: {
     alignItems: 'center',
@@ -470,7 +542,6 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
     gap: 8,
   },
-  emptyTitle: { fontSize: 16, fontWeight: '700', marginTop: 4 },
 
   modalOverlay: {
     flex: 1,
@@ -484,12 +555,9 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '86%',
     maxWidth: 420,
-    borderRadius: 18,
     padding: 22,
   },
-  modalTitle: { fontSize: 19, fontWeight: '800', marginBottom: 12 },
   modalInput: {
-    borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -499,8 +567,6 @@ const styles = StyleSheet.create({
   modalBtn: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 12,
     alignItems: 'center',
   },
-  modalBtnText: { fontSize: 14, fontWeight: '700' },
 });

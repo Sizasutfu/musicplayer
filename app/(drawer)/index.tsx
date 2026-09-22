@@ -46,30 +46,19 @@ function MenuButton() {
 export default function LibraryScreen() {
   const { songs, loading, enriching, granted, error, refresh } = useLibrary();
   const { playQueue, currentTrack } = usePlayer();
-  const { colors } = useTheme();
+  const { colors, design } = useTheme();
   const navigation = useNavigation();
 
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [sort, setSort] = useState<SortMode>('title');
   const [actionSong, setActionSong] = useState<Song | null>(null);
-  const [actionOpen, setActionOpen] = useState(false);
   const inputRef = useRef<TextInput>(null);
 
   const openSearch = useCallback(() => setSearchOpen(true), []);
   const closeSearch = useCallback(() => {
     setSearchOpen(false);
     setQuery('');
-  }, []);
-
-  const openActions = useCallback((song: Song) => {
-    setActionSong(song);
-    setActionOpen(true);
-  }, []);
-
-  const closeActions = useCallback(() => {
-    setActionOpen(false);
-    setActionSong(null);
   }, []);
 
   useLayoutEffect(() => {
@@ -175,7 +164,9 @@ export default function LibraryScreen() {
         edges={['left', 'right']}
       >
         <Feather name="music" size={42} color={colors.iconMuted} />
-        <Text style={[styles.msgTitle, { color: colors.text }]}>
+        <Text
+          style={[design.type.heading, { color: colors.text, marginTop: 4 }]}
+        >
           No access to your music
         </Text>
         <Text style={[styles.mutedText, { color: colors.textSecondary }]}>
@@ -199,7 +190,7 @@ export default function LibraryScreen() {
         style={[styles.center, { backgroundColor: colors.background }]}
         edges={['left', 'right']}
       >
-        <Text style={[styles.msgTitle, { color: colors.text }]}>
+        <Text style={[design.type.heading, { color: colors.text }]}>
           Something went wrong
         </Text>
         <Text style={[styles.mutedText, { color: colors.textSecondary }]}>
@@ -222,7 +213,16 @@ export default function LibraryScreen() {
       style={[styles.root, { backgroundColor: colors.background }]}
       edges={['left', 'right']}
     >
-      <View style={styles.sortRow}>
+      <View
+        style={[
+          styles.sortRow,
+          {
+            paddingTop: design.spacing.section - 8,
+            paddingBottom: design.spacing.item,
+            gap: design.spacing.item - 4,
+          },
+        ]}
+      >
         {(['title', 'artist', 'album'] as SortMode[]).map((mode) => {
           const active = sort === mode;
           return (
@@ -231,15 +231,15 @@ export default function LibraryScreen() {
               onPress={() => setSort(mode)}
               style={[
                 styles.sortBtn,
-                { backgroundColor: colors.chipBg },
+                { backgroundColor: colors.chipBg, borderRadius: design.radius.pill },
                 active && { backgroundColor: colors.chipBgActive },
               ]}
             >
               <Text
                 style={[
-                  styles.sortBtnText,
+                  design.type.caption,
                   { color: colors.chipText },
-                  active && { color: colors.chipTextActive },
+                  active && { color: colors.chipTextActive, fontWeight: '700' },
                 ]}
               >
                 {mode.charAt(0).toUpperCase() + mode.slice(1)}
@@ -251,11 +251,19 @@ export default function LibraryScreen() {
           <View
             style={[
               styles.enrichingChip,
-              { backgroundColor: colors.rowActive },
+              {
+                backgroundColor: colors.rowActive,
+                borderRadius: design.radius.pill,
+              },
             ]}
           >
             <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={[styles.enrichingText, { color: colors.primary }]}>
+            <Text
+              style={[
+                design.type.caption,
+                { color: colors.primary, fontWeight: '700' },
+              ]}
+            >
               Reading tags
             </Text>
           </View>
@@ -276,15 +284,15 @@ export default function LibraryScreen() {
             song={item}
             isActive={currentTrack?.id === item.id}
             onPress={() => playQueue(filtered, index)}
-            onLongPress={() => openActions(item)}
-            onMore={() => openActions(item)}
+            onLongPress={() => setActionSong(item)}
             colors={colors}
+            design={design}
           />
         )}
         ListEmptyComponent={
           <View style={styles.center}>
             <Feather name="music" size={42} color={colors.iconMuted} />
-            <Text style={[styles.msgTitle, { color: colors.text }]}>
+            <Text style={[design.type.heading, { color: colors.text }]}>
               {query ? 'No matches' : 'No songs found'}
             </Text>
             <Text style={[styles.mutedText, { color: colors.textSecondary }]}>
@@ -299,9 +307,9 @@ export default function LibraryScreen() {
       <MiniPlayer />
 
       <SongActionSheet
-        visible={actionOpen}
+        visible={!!actionSong}
         song={actionSong}
-        onClose={closeActions}
+        onClose={() => setActionSong(null)}
       />
     </SafeAreaView>
   );
@@ -312,15 +320,15 @@ const SongRow = React.memo(function SongRow({
   isActive,
   onPress,
   onLongPress,
-  onMore,
   colors,
+  design,
 }: {
   song: Song;
   isActive: boolean;
   onPress: () => void;
   onLongPress: () => void;
-  onMore: () => void;
   colors: any;
+  design: any;
 }) {
   return (
     <Pressable
@@ -329,17 +337,31 @@ const SongRow = React.memo(function SongRow({
       delayLongPress={400}
       style={({ pressed }) => [
         styles.row,
+        {
+          paddingVertical: design.row.paddingVertical,
+          borderBottomWidth: design.row.borderBottomWidth,
+          borderBottomColor: design.row.borderBottomColor,
+        },
         isActive && { backgroundColor: colors.rowActive },
         pressed && { opacity: 0.7 },
       ]}
     >
       {song.artwork ? (
-        <Image source={{ uri: song.artwork }} style={styles.artImage} />
+        <Image
+          source={{ uri: song.artwork }}
+          style={[
+            styles.artImage,
+            { borderRadius: design.radius.item, backgroundColor: colors.artPlaceholder },
+          ]}
+        />
       ) : (
         <View
           style={[
             styles.artPlaceholder,
-            { backgroundColor: colors.artPlaceholder },
+            {
+              borderRadius: design.radius.item,
+              backgroundColor: colors.artPlaceholder,
+            },
             isActive && { backgroundColor: colors.primary },
           ]}
         >
@@ -355,8 +377,8 @@ const SongRow = React.memo(function SongRow({
         <Text
           numberOfLines={1}
           style={[
-            styles.title,
-            { color: colors.text },
+            design.type.body,
+            { color: colors.text, fontWeight: '600' },
             isActive && { color: colors.primary },
           ]}
         >
@@ -364,7 +386,10 @@ const SongRow = React.memo(function SongRow({
         </Text>
         <Text
           numberOfLines={1}
-          style={[styles.sub, { color: colors.textSecondary }]}
+          style={[
+            design.type.caption,
+            { color: colors.textSecondary, marginTop: 2 },
+          ]}
         >
           {song.artist}
           {song.album && song.album !== 'Unknown Album'
@@ -373,20 +398,7 @@ const SongRow = React.memo(function SongRow({
         </Text>
       </View>
 
-      {isActive && (
-        <Feather name="volume-2" size={16} color={colors.primary} />
-      )}
-
-      <Pressable
-        onPress={(e) => {
-          e.stopPropagation();
-          onMore();
-        }}
-        hitSlop={8}
-        style={styles.moreBtn}
-      >
-        <Feather name="more-vertical" size={18} color={colors.iconMuted} />
-      </Pressable>
+      {isActive && <Feather name="volume-2" size={16} color={colors.primary} />}
     </Pressable>
   );
 });
@@ -400,7 +412,6 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 8,
   },
-  msgTitle: { fontSize: 17, fontWeight: '700', marginTop: 4 },
   mutedText: { fontSize: 14, textAlign: 'center' },
   primaryBtn: {
     marginTop: 14,
@@ -421,17 +432,12 @@ const styles = StyleSheet.create({
   sortRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 8,
   },
   sortBtn: {
     paddingHorizontal: 14,
     paddingVertical: 6,
-    borderRadius: 16,
   },
-  sortBtnText: { fontSize: 13, fontWeight: '600' },
   enrichingChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -439,31 +445,22 @@ const styles = StyleSheet.create({
     marginLeft: 'auto',
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
   },
-  enrichingText: { fontSize: 11, fontWeight: '600' },
 
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 20,
-    paddingVertical: 12,
   },
   artPlaceholder: {
     width: 44,
     height: 44,
-    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  artImage: { width: 44, height: 44, borderRadius: 8 },
-  title: { fontSize: 15, fontWeight: '600' },
-  sub: { fontSize: 13, marginTop: 2 },
-  moreBtn: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
+  artImage: {
+    width: 44,
+    height: 44,
   },
 });

@@ -14,6 +14,11 @@ import {
   loadSettings,
   saveSettings,
 } from '../lib/settings';
+import {
+  type DesignSystem,
+  LIGHT_DESIGN,
+  DARK_DESIGN,
+} from '../lib/design';
 
 // ── Color tokens ─────────────────────────────────────────
 export type ThemeColors = {
@@ -79,7 +84,7 @@ export const LIGHT: ThemeColors = {
 export const DARK: ThemeColors = {
   background: '#0e0e10',
   surface: '#18181b',
-  surfaceElevated: '#1f2024',
+  surfaceElevated: '#1c1c1f',
   text: '#f4f4f5',
   textSecondary: '#a1a1aa',
   textMuted: '#71717a',
@@ -92,14 +97,14 @@ export const DARK: ThemeColors = {
   rowActive: '#1e293b',
   danger: '#f87171',
   headerBg: '#0e0e10',
-  headerBorder: '#27272a',
+  headerBorder: '#0e0e10',
   searchBg: '#1f2024',
   chipBg: '#1f2024',
   chipText: '#a1a1aa',
   chipBgActive: '#3b82f6',
   chipTextActive: '#ffffff',
   artPlaceholder: '#27272a',
-  miniPlayerBg: '#1f2024',
+  miniPlayerBg: '#1c1c1f',
   miniPlayerText: '#f4f4f5',
   miniPlayerTextSecondary: 'rgba(255,255,255,0.6)',
   miniPlayerBtnBg: 'rgba(255,255,255,0.08)',
@@ -110,6 +115,7 @@ export const DARK: ThemeColors = {
 type ThemeContextValue = {
   settings: Settings;
   colors: ThemeColors;
+  design: DesignSystem;
   isDark: boolean;
   loaded: boolean;
   setTheme: (mode: Settings['theme']) => void;
@@ -159,18 +165,20 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, [settings.theme, systemScheme]);
 
   const colors = isDark ? DARK : LIGHT;
+  const design = isDark ? DARK_DESIGN : LIGHT_DESIGN;
 
   const value = useMemo<ThemeContextValue>(
     () => ({
       settings,
       colors,
+      design,
       isDark,
       loaded,
       setTheme,
       updateSetting,
       resetSettings,
     }),
-    [settings, colors, isDark, loaded, setTheme, updateSetting, resetSettings]
+    [settings, colors, design, isDark, loaded, setTheme, updateSetting, resetSettings]
   );
 
   return (
@@ -184,7 +192,6 @@ export function useTheme() {
   return ctx;
 }
 
-// Backwards-compatible hook — same signature as the old useSettings
 export function useSettings() {
   const { settings, loaded, updateSetting, resetSettings } = useTheme();
   return {

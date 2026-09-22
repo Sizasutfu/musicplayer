@@ -32,7 +32,7 @@ export default function ArtistDetailScreen() {
   const { name } = useLocalSearchParams<{ name: string }>();
   const { songs } = useLibrary();
   const { playQueue, currentTrack, isPlaying } = usePlayer();
-  const { colors } = useTheme();
+  const { colors, design } = useTheme();
   const [tab, setTab] = useState<Tab>('albums');
   const [actionSong, setActionSong] = useState<Song | null>(null);
 
@@ -68,10 +68,15 @@ export default function ArtistDetailScreen() {
           <Feather name="chevron-left" size={26} color={colors.icon} />
         </Pressable>
         <View style={styles.center}>
-          <Text style={[styles.msgTitle, { color: colors.text }]}>
+          <Text style={[design.type.heading, { color: colors.text }]}>
             Artist not found
           </Text>
-          <Text style={[styles.mutedText, { color: colors.textSecondary }]}>
+          <Text
+            style={[
+              design.type.caption,
+              { color: colors.textSecondary, marginTop: 4 },
+            ]}
+          >
             They may have been removed from your library.
           </Text>
         </View>
@@ -89,7 +94,10 @@ export default function ArtistDetailScreen() {
           <Feather name="chevron-left" size={26} color={colors.icon} />
         </Pressable>
         <Text
-          style={[styles.topBarTitle, { color: colors.text }]}
+          style={[
+            design.type.caption,
+            { color: colors.text, fontWeight: '700' },
+          ]}
           numberOfLines={1}
         >
           Artist
@@ -113,13 +121,19 @@ export default function ArtistDetailScreen() {
               onTabChange={setTab}
               onPlayAll={handlePlayAll}
               colors={colors}
+              design={design}
             />
           }
           renderItem={({ item }) => (
-            <AlbumTile album={item} colors={colors} />
+            <AlbumTile album={item} colors={colors} design={design} />
           )}
           ListEmptyComponent={
-            <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+            <Text
+              style={[
+                design.type.caption,
+                { color: colors.textMuted, textAlign: 'center', paddingVertical: 24 },
+              ]}
+            >
               No albums
             </Text>
           }
@@ -138,6 +152,7 @@ export default function ArtistDetailScreen() {
               onTabChange={setTab}
               onPlayAll={handlePlayAll}
               colors={colors}
+              design={design}
             />
           }
           renderItem={({ item, index }) => {
@@ -149,6 +164,11 @@ export default function ArtistDetailScreen() {
                 delayLongPress={400}
                 style={({ pressed }) => [
                   styles.songRow,
+                  {
+                    paddingVertical: design.row.paddingVertical,
+                    borderBottomWidth: design.row.borderBottomWidth,
+                    borderBottomColor: design.row.borderBottomColor,
+                  },
                   active && { backgroundColor: colors.rowActive },
                   pressed && { opacity: 0.7 },
                 ]}
@@ -163,8 +183,11 @@ export default function ArtistDetailScreen() {
                   ) : (
                     <Text
                       style={[
-                        styles.songNum,
-                        { color: colors.textMuted },
+                        design.type.caption,
+                        {
+                          color: colors.textMuted,
+                          fontVariant: ['tabular-nums'],
+                        },
                         active && { color: colors.primary },
                       ]}
                     >
@@ -177,8 +200,8 @@ export default function ArtistDetailScreen() {
                   <Text
                     numberOfLines={1}
                     style={[
-                      styles.songTitle,
-                      { color: colors.text },
+                      design.type.body,
+                      { color: colors.text, fontWeight: '600' },
                       active && { color: colors.primary },
                     ]}
                   >
@@ -186,7 +209,10 @@ export default function ArtistDetailScreen() {
                   </Text>
                   <Text
                     numberOfLines={1}
-                    style={[styles.songSub, { color: colors.textSecondary }]}
+                    style={[
+                      design.type.caption,
+                      { color: colors.textSecondary, marginTop: 2 },
+                    ]}
                   >
                     {item.album && item.album !== 'Unknown Album'
                       ? item.album
@@ -194,7 +220,16 @@ export default function ArtistDetailScreen() {
                   </Text>
                 </View>
 
-                <Text style={[styles.duration, { color: colors.textMuted }]}>
+                <Text
+                  style={[
+                    design.type.caption,
+                    {
+                      color: colors.textMuted,
+                      fontVariant: ['tabular-nums'],
+                      marginLeft: 8,
+                    },
+                  ]}
+                >
                   {formatDuration(item.duration)}
                 </Text>
               </Pressable>
@@ -220,12 +255,14 @@ function ArtistHeader({
   onTabChange,
   onPlayAll,
   colors,
+  design,
 }: {
   artist: Artist;
   tab: Tab;
   onTabChange: (t: Tab) => void;
   onPlayAll: () => void;
   colors: any;
+  design: any;
 }) {
   const AVATAR_SIZE = 140;
 
@@ -263,11 +300,19 @@ function ArtistHeader({
 
       <Text
         numberOfLines={2}
-        style={[styles.artistName, { color: colors.text }]}
+        style={[
+          design.type.title,
+          { color: colors.text, textAlign: 'center' },
+        ]}
       >
         {artist.name}
       </Text>
-      <Text style={[styles.artistMeta, { color: colors.textMuted }]}>
+      <Text
+        style={[
+          design.type.caption,
+          { color: colors.textMuted, marginTop: 4 },
+        ]}
+      >
         {artist.albums.length}{' '}
         {artist.albums.length === 1 ? 'album' : 'albums'}
         {' · '}
@@ -279,12 +324,20 @@ function ArtistHeader({
         onPress={onPlayAll}
         style={({ pressed }) => [
           styles.playAllBtn,
-          { backgroundColor: colors.primary },
+          {
+            backgroundColor: colors.primary,
+            borderRadius: design.radius.pill,
+          },
           pressed && { opacity: 0.85 },
         ]}
       >
         <Feather name="play" size={18} color={colors.primaryText} />
-        <Text style={[styles.playAllText, { color: colors.primaryText }]}>
+        <Text
+          style={[
+            design.type.body,
+            { color: colors.primaryText, fontWeight: '700' },
+          ]}
+        >
           Play all
         </Text>
       </Pressable>
@@ -298,15 +351,21 @@ function ArtistHeader({
               onPress={() => onTabChange(t)}
               style={[
                 styles.tab,
-                { backgroundColor: colors.chipBg },
+                {
+                  backgroundColor: colors.chipBg,
+                  borderRadius: design.radius.pill,
+                },
                 active && { backgroundColor: colors.chipBgActive },
               ]}
             >
               <Text
                 style={[
-                  styles.tabText,
-                  { color: colors.chipText },
-                  active && { color: colors.chipTextActive },
+                  design.type.caption,
+                  { color: colors.chipText, fontWeight: '600' },
+                  active && {
+                    color: colors.chipTextActive,
+                    fontWeight: '700',
+                  },
                 ]}
               >
                 {t.charAt(0).toUpperCase() + t.slice(1)}
@@ -319,7 +378,15 @@ function ArtistHeader({
   );
 }
 
-function AlbumTile({ album, colors }: { album: Album; colors: any }) {
+function AlbumTile({
+  album,
+  colors,
+  design,
+}: {
+  album: Album;
+  colors: any;
+  design: any;
+}) {
   return (
     <Pressable
       style={({ pressed }) => [styles.tile, pressed && { opacity: 0.7 }]}
@@ -331,13 +398,20 @@ function AlbumTile({ album, colors }: { album: Album; colors: any }) {
       }
     >
       {album.artwork ? (
-        <Image source={{ uri: album.artwork }} style={styles.art} />
+        <Image
+          source={{ uri: album.artwork }}
+          style={[styles.art, { borderRadius: design.radius.item + 2 }]}
+        />
       ) : (
         <View
           style={[
             styles.art,
-            styles.artPlaceholder,
-            { backgroundColor: colors.artPlaceholder },
+            {
+              borderRadius: design.radius.item + 2,
+              backgroundColor: colors.artPlaceholder,
+              alignItems: 'center',
+              justifyContent: 'center',
+            },
           ]}
         >
           <Feather name="disc" size={36} color={colors.iconMuted} />
@@ -345,13 +419,23 @@ function AlbumTile({ album, colors }: { album: Album; colors: any }) {
       )}
       <Text
         numberOfLines={1}
-        style={[styles.tileTitle, { color: colors.text }]}
+        style={[
+          design.type.body,
+          {
+            color: colors.text,
+            fontWeight: '700',
+            marginTop: 8,
+          },
+        ]}
       >
         {album.title}
       </Text>
       <Text
         numberOfLines={1}
-        style={[styles.tileMeta, { color: colors.textMuted }]}
+        style={[
+          design.type.caption,
+          { color: colors.textMuted, marginTop: 2 },
+        ]}
       >
         {album.songs.length} {album.songs.length === 1 ? 'track' : 'tracks'}
       </Text>
@@ -373,10 +457,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
-    gap: 8,
+    gap: 4,
   },
-  msgTitle: { fontSize: 17, fontWeight: '700' },
-  mutedText: { fontSize: 14, textAlign: 'center' },
 
   topBar: {
     flexDirection: 'row',
@@ -398,7 +480,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginLeft: 8,
   },
-  topBarTitle: { fontSize: 14, fontWeight: '700' },
 
   headerBlock: {
     alignItems: 'center',
@@ -414,8 +495,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     elevation: 4,
   },
-  artistName: { fontSize: 24, fontWeight: '800', textAlign: 'center' },
-  artistMeta: { fontSize: 13, marginTop: 4 },
 
   playAllBtn: {
     flexDirection: 'row',
@@ -424,17 +503,13 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 26,
   },
-  playAllText: { fontWeight: '700', fontSize: 15 },
 
   tabRow: { flexDirection: 'row', gap: 8, marginTop: 20 },
   tab: {
     paddingHorizontal: 20,
     paddingVertical: 8,
-    borderRadius: 18,
   },
-  tabText: { fontSize: 13, fontWeight: '600' },
 
   gridContent: {
     paddingHorizontal: H_PADDING,
@@ -442,31 +517,13 @@ const styles = StyleSheet.create({
     gap: GAP,
   },
   tile: { width: TILE_SIZE, marginBottom: GAP },
-  art: { width: TILE_SIZE, height: TILE_SIZE, borderRadius: 10 },
-  artPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  tileTitle: { fontSize: 14, fontWeight: '700', marginTop: 8 },
-  tileMeta: { fontSize: 11, marginTop: 2 },
-
-  emptyText: {
-    textAlign: 'center',
-    paddingVertical: 24,
-    fontSize: 14,
-  },
+  art: { width: TILE_SIZE, height: TILE_SIZE },
 
   songRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 20,
-    paddingVertical: 12,
   },
   songNumWrap: { width: 24, alignItems: 'center', justifyContent: 'center' },
-  songNum: { fontSize: 13, fontVariant: ['tabular-nums'] },
-  songTitle: { fontSize: 15, fontWeight: '600' },
-  songSub: { fontSize: 12, marginTop: 2 },
-  duration: {
-    fontSize: 12,
-    fontVariant: ['tabular-nums'],
-    marginLeft: 8,
-  },
 });

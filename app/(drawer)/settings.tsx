@@ -20,9 +20,11 @@ import { useLibrary } from '../../hooks/useLibrary';
 
 type IconName = React.ComponentProps<typeof Feather>['name'];
 type Colors = ReturnType<typeof useTheme>['colors'];
+type Design = ReturnType<typeof useTheme>['design'];
 
 export default function SettingsScreen() {
-  const { settings, colors, updateSetting, resetSettings, loaded } = useTheme();
+  const { settings, colors, design, updateSetting, resetSettings, loaded } =
+    useTheme();
   const { refresh, songs } = useLibrary();
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -52,26 +54,26 @@ export default function SettingsScreen() {
       'All preferences will return to their defaults. Your music is untouched.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Reset', style: 'destructive', onPress: () => resetSettings() },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: () => resetSettings(),
+        },
       ]
     );
   };
 
   const runShowWelcome = () => {
-    Alert.alert(
-      'Show welcome screen?',
-      'You will be taken back to the onboarding flow.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Show',
-          onPress: async () => {
-            await resetOnboarding();
-            router.replace('/welcome');
-          },
+    Alert.alert('Show welcome screen?', 'You will be taken back to onboarding.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Show',
+        onPress: async () => {
+          await resetOnboarding();
+          router.replace('/welcome');
         },
-      ]
-    );
+      },
+    ]);
   };
 
   if (!loaded) {
@@ -91,12 +93,19 @@ export default function SettingsScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <Section title="Appearance" colors={colors}>
-          <Row colors={colors} noDivider>
-            <RowIcon name="moon" colors={colors} />
-            <RowLabel colors={colors}>Theme</RowLabel>
+        <Section title="Appearance" colors={colors} design={design}>
+          <Row colors={colors} design={design} noDivider>
+            <RowIcon name="moon" colors={colors} design={design} />
+            <RowLabel colors={colors} design={design}>
+              Theme
+            </RowLabel>
           </Row>
-          <View style={styles.segmentRow}>
+          <View
+            style={[
+              styles.segmentRow,
+              { gap: 8, paddingHorizontal: 14, paddingBottom: 14 },
+            ]}
+          >
             {(['system', 'light', 'dark'] as const).map((mode) => {
               const active = settings.theme === mode;
               return (
@@ -105,15 +114,21 @@ export default function SettingsScreen() {
                   onPress={() => updateSetting('theme', mode)}
                   style={[
                     styles.segment,
-                    { backgroundColor: colors.chipBg },
+                    {
+                      backgroundColor: colors.chipBg,
+                      borderRadius: design.radius.item,
+                    },
                     active && { backgroundColor: colors.primary },
                   ]}
                 >
                   <Text
                     style={[
-                      styles.segmentText,
-                      { color: colors.chipText },
-                      active && { color: colors.primaryText },
+                      design.type.caption,
+                      { color: colors.chipText, fontWeight: '600' },
+                      active && {
+                        color: colors.primaryText,
+                        fontWeight: '700',
+                      },
                     ]}
                   >
                     {mode.charAt(0).toUpperCase() + mode.slice(1)}
@@ -124,7 +139,7 @@ export default function SettingsScreen() {
           </View>
         </Section>
 
-        <Section title="Playback" colors={colors}>
+        <Section title="Playback" colors={colors} design={design}>
           <ToggleRow
             icon="play-circle"
             label="Continue playback"
@@ -132,6 +147,7 @@ export default function SettingsScreen() {
             value={settings.continuePlaybackOnKill}
             onChange={(v) => updateSetting('continuePlaybackOnKill', v)}
             colors={colors}
+            design={design}
           />
           <ToggleRow
             icon="headphones"
@@ -140,6 +156,7 @@ export default function SettingsScreen() {
             value={settings.headphoneControls}
             onChange={(v) => updateSetting('headphoneControls', v)}
             colors={colors}
+            design={design}
           />
           <ToggleRow
             icon="skip-forward"
@@ -148,11 +165,12 @@ export default function SettingsScreen() {
             value={settings.autoplayNext}
             onChange={(v) => updateSetting('autoplayNext', v)}
             colors={colors}
+            design={design}
             last
           />
         </Section>
 
-        <Section title="Library" colors={colors}>
+        <Section title="Library" colors={colors} design={design}>
           <ActionRow
             icon="refresh-cw"
             label="Rescan library"
@@ -160,6 +178,7 @@ export default function SettingsScreen() {
             busy={busy === 'rescan'}
             onPress={runRescan}
             colors={colors}
+            design={design}
           />
           <ActionRow
             icon="trash-2"
@@ -168,6 +187,7 @@ export default function SettingsScreen() {
             busy={busy === 'clear-cache'}
             onPress={runClearCache}
             colors={colors}
+            design={design}
           />
           <ToggleRow
             icon="eye-off"
@@ -176,16 +196,18 @@ export default function SettingsScreen() {
             value={settings.showHiddenFiles}
             onChange={(v) => updateSetting('showHiddenFiles', v)}
             colors={colors}
+            design={design}
             last
           />
         </Section>
 
-        <Section title="About" colors={colors}>
+        <Section title="About" colors={colors} design={design}>
           <ActionRow
             icon="info"
             label="Version"
             description="1.0.0"
             colors={colors}
+            design={design}
           />
           <ActionRow
             icon="play-circle"
@@ -193,6 +215,7 @@ export default function SettingsScreen() {
             description="Replay the onboarding flow"
             onPress={runShowWelcome}
             colors={colors}
+            design={design}
           />
           <ActionRow
             icon="rotate-ccw"
@@ -201,17 +224,19 @@ export default function SettingsScreen() {
             destructive
             onPress={runResetSettings}
             colors={colors}
+            design={design}
           />
           <ActionRow
             icon="file-text"
             label="Tracks in library"
             description={`${songs.length} on this device`}
             colors={colors}
+            design={design}
             last
           />
         </Section>
 
-        <Text style={[styles.footer, { color: colors.textMuted }]}>
+        <Text style={[design.type.caption, { color: colors.textMuted, textAlign: 'center', marginTop: 32 }]}>
           Made with React Native + Expo
         </Text>
       </ScrollView>
@@ -224,21 +249,29 @@ export default function SettingsScreen() {
 function Section({
   title,
   colors,
+  design,
   children,
 }: {
   title: string;
   colors: Colors;
+  design: Design;
   children: React.ReactNode;
 }) {
   return (
-    <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
-        {title.toUpperCase()}
+    <View style={[styles.section, { marginTop: design.spacing.section }]}>
+      <Text
+        style={[
+          design.type.sectionLabel,
+          { color: colors.textMuted, marginHorizontal: 20, marginBottom: 8 },
+        ]}
+      >
+        {title}
       </Text>
       <View
         style={[
+          design.card,
           styles.card,
-          { backgroundColor: colors.surface, borderColor: colors.border },
+          { backgroundColor: colors.surface },
         ]}
       >
         {children}
@@ -249,10 +282,12 @@ function Section({
 
 function Row({
   colors,
+  design,
   noDivider,
   children,
 }: {
   colors: Colors;
+  design: Design;
   noDivider?: boolean;
   children: React.ReactNode;
 }) {
@@ -260,7 +295,7 @@ function Row({
     <View
       style={[
         styles.row,
-        !noDivider && {
+        !noDivider && design.showRowDividers && {
           borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.borderSubtle,
         },
@@ -275,10 +310,12 @@ function RowIcon({
   name,
   destructive,
   colors,
+  design,
 }: {
   name: IconName;
   destructive?: boolean;
   colors: Colors;
+  design: Design;
 }) {
   return (
     <View
@@ -288,6 +325,7 @@ function RowIcon({
           backgroundColor: destructive
             ? 'rgba(239,68,68,0.12)'
             : colors.rowActive,
+          borderRadius: design.radius.item - 2,
         },
       ]}
     >
@@ -304,16 +342,18 @@ function RowLabel({
   children,
   destructive,
   colors,
+  design,
 }: {
   children: React.ReactNode;
   destructive?: boolean;
   colors: Colors;
+  design: Design;
 }) {
   return (
     <Text
       style={[
-        styles.label,
-        { color: destructive ? colors.danger : colors.text },
+        design.type.body,
+        { color: destructive ? colors.danger : colors.text, fontWeight: '600' },
       ]}
     >
       {children}
@@ -328,6 +368,7 @@ function ToggleRow({
   value,
   onChange,
   colors,
+  design,
   last,
 }: {
   icon: IconName;
@@ -336,23 +377,31 @@ function ToggleRow({
   value: boolean;
   onChange: (v: boolean) => void;
   colors: Colors;
+  design: Design;
   last?: boolean;
 }) {
   return (
     <View
       style={[
         styles.row,
-        !last && {
+        !last && design.showRowDividers && {
           borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.borderSubtle,
         },
       ]}
     >
-      <RowIcon name={icon} colors={colors} />
+      <RowIcon name={icon} colors={colors} design={design} />
       <View style={{ flex: 1 }}>
-        <RowLabel colors={colors}>{label}</RowLabel>
+        <RowLabel colors={colors} design={design}>
+          {label}
+        </RowLabel>
         {description ? (
-          <Text style={[styles.description, { color: colors.textMuted }]}>
+          <Text
+            style={[
+              design.type.caption,
+              { color: colors.textMuted, marginTop: 2 },
+            ]}
+          >
             {description}
           </Text>
         ) : null}
@@ -375,6 +424,7 @@ function ActionRow({
   busy,
   destructive,
   colors,
+  design,
   last,
 }: {
   icon: IconName;
@@ -384,6 +434,7 @@ function ActionRow({
   busy?: boolean;
   destructive?: boolean;
   colors: Colors;
+  design: Design;
   last?: boolean;
 }) {
   const disabled = !onPress || busy;
@@ -393,20 +444,30 @@ function ActionRow({
       disabled={disabled}
       style={({ pressed }) => [
         styles.row,
-        !last && {
+        !last && design.showRowDividers && {
           borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.borderSubtle,
         },
         pressed && onPress && { opacity: 0.6 },
       ]}
     >
-      <RowIcon name={icon} destructive={destructive} colors={colors} />
+      <RowIcon
+        name={icon}
+        destructive={destructive}
+        colors={colors}
+        design={design}
+      />
       <View style={{ flex: 1 }}>
-        <RowLabel destructive={destructive} colors={colors}>
+        <RowLabel destructive={destructive} colors={colors} design={design}>
           {label}
         </RowLabel>
         {description ? (
-          <Text style={[styles.description, { color: colors.textMuted }]}>
+          <Text
+            style={[
+              design.type.caption,
+              { color: colors.textMuted, marginTop: 2 },
+            ]}
+          >
             {description}
           </Text>
         ) : null}
@@ -424,22 +485,11 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { paddingTop: 8, paddingBottom: 40 },
-
-  section: { marginTop: 20 },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    marginHorizontal: 20,
-    marginBottom: 8,
-  },
+  section: {},
   card: {
     marginHorizontal: 16,
-    borderRadius: 14,
     overflow: 'hidden',
-    borderWidth: StyleSheet.hairlineWidth,
   },
-
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -451,30 +501,15 @@ const styles = StyleSheet.create({
   iconWrap: {
     width: 32,
     height: 32,
-    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  label: { fontSize: 15, fontWeight: '600' },
-  description: { fontSize: 12, marginTop: 2 },
-
   segmentRow: {
     flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingBottom: 14,
   },
   segment: {
     flex: 1,
     paddingVertical: 9,
-    borderRadius: 10,
     alignItems: 'center',
-  },
-  segmentText: { fontSize: 13, fontWeight: '600' },
-
-  footer: {
-    textAlign: 'center',
-    fontSize: 12,
-    marginTop: 32,
   },
 });

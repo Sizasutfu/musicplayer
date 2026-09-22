@@ -33,7 +33,7 @@ export default function AlbumDetailScreen() {
   const { key } = useLocalSearchParams<{ key: string }>();
   const { songs } = useLibrary();
   const { playQueue, currentTrack, isPlaying } = usePlayer();
-  const { colors } = useTheme();
+  const { colors, design } = useTheme();
   const [actionSong, setActionSong] = useState<Song | null>(null);
 
   const albumKey = useMemo(() => {
@@ -68,10 +68,15 @@ export default function AlbumDetailScreen() {
           <Feather name="chevron-left" size={26} color={colors.icon} />
         </Pressable>
         <View style={styles.center}>
-          <Text style={[styles.msgTitle, { color: colors.text }]}>
+          <Text style={[design.type.heading, { color: colors.text }]}>
             Album not found
           </Text>
-          <Text style={[styles.mutedText, { color: colors.textSecondary }]}>
+          <Text
+            style={[
+              design.type.caption,
+              { color: colors.textSecondary, marginTop: 4 },
+            ]}
+          >
             It may have been removed from your library.
           </Text>
         </View>
@@ -89,7 +94,7 @@ export default function AlbumDetailScreen() {
           <Feather name="chevron-left" size={26} color={colors.icon} />
         </Pressable>
         <Text
-          style={[styles.topBarTitle, { color: colors.text }]}
+          style={[design.type.caption, { color: colors.text, fontWeight: '700' }]}
           numberOfLines={1}
         >
           Album
@@ -101,16 +106,27 @@ export default function AlbumDetailScreen() {
         data={album.songs}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingBottom: 160 }}
+        showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <View style={styles.headerBlock}>
             {album.artwork ? (
-              <Image source={{ uri: album.artwork }} style={styles.art} />
+              <Image
+                source={{ uri: album.artwork }}
+                style={[
+                  styles.art,
+                  { borderRadius: design.radius.card + 4 },
+                ]}
+              />
             ) : (
               <View
                 style={[
                   styles.art,
-                  styles.artPlaceholder,
-                  { backgroundColor: colors.artPlaceholder },
+                  {
+                    borderRadius: design.radius.card + 4,
+                    backgroundColor: colors.artPlaceholder,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  },
                 ]}
               >
                 <Feather name="disc" size={72} color={colors.iconMuted} />
@@ -119,17 +135,28 @@ export default function AlbumDetailScreen() {
 
             <Text
               numberOfLines={2}
-              style={[styles.title, { color: colors.text }]}
+              style={[
+                design.type.title,
+                { color: colors.text, textAlign: 'center' },
+              ]}
             >
               {album.title}
             </Text>
             <Text
               numberOfLines={1}
-              style={[styles.artist, { color: colors.textSecondary }]}
+              style={[
+                design.type.body,
+                { color: colors.textSecondary, marginTop: 4, textAlign: 'center' },
+              ]}
             >
               {album.artist}
             </Text>
-            <Text style={[styles.meta, { color: colors.textMuted }]}>
+            <Text
+              style={[
+                design.type.caption,
+                { color: colors.textMuted, marginTop: 6 },
+              ]}
+            >
               {album.songs.length}{' '}
               {album.songs.length === 1 ? 'track' : 'tracks'}
             </Text>
@@ -138,13 +165,22 @@ export default function AlbumDetailScreen() {
               onPress={handlePlayAll}
               style={({ pressed }) => [
                 styles.playAllBtn,
-                { backgroundColor: colors.primary },
+                {
+                  backgroundColor: colors.primary,
+                  borderRadius: design.radius.pill,
+                },
                 pressed && { opacity: 0.85 },
               ]}
             >
               <Feather name="play" size={18} color={colors.primaryText} />
               <Text
-                style={[styles.playAllText, { color: colors.primaryText }]}
+                style={[
+                  design.type.body,
+                  {
+                    color: colors.primaryText,
+                    fontWeight: '700',
+                  },
+                ]}
               >
                 Play all
               </Text>
@@ -160,6 +196,11 @@ export default function AlbumDetailScreen() {
               delayLongPress={400}
               style={({ pressed }) => [
                 styles.row,
+                {
+                  paddingVertical: design.row.paddingVertical,
+                  borderBottomWidth: design.row.borderBottomWidth,
+                  borderBottomColor: design.row.borderBottomColor,
+                },
                 active && { backgroundColor: colors.rowActive },
                 pressed && { opacity: 0.7 },
               ]}
@@ -170,8 +211,11 @@ export default function AlbumDetailScreen() {
                 ) : (
                   <Text
                     style={[
-                      styles.trackNum,
-                      { color: colors.textMuted },
+                      design.type.caption,
+                      {
+                        color: colors.textMuted,
+                        fontVariant: ['tabular-nums'],
+                      },
                       active && { color: colors.primary },
                     ]}
                   >
@@ -184,8 +228,8 @@ export default function AlbumDetailScreen() {
                 <Text
                   numberOfLines={1}
                   style={[
-                    styles.trackTitle,
-                    { color: colors.text },
+                    design.type.body,
+                    { color: colors.text, fontWeight: '600' },
                     active && { color: colors.primary },
                   ]}
                 >
@@ -193,13 +237,25 @@ export default function AlbumDetailScreen() {
                 </Text>
                 <Text
                   numberOfLines={1}
-                  style={[styles.trackArtist, { color: colors.textSecondary }]}
+                  style={[
+                    design.type.caption,
+                    { color: colors.textSecondary, marginTop: 2 },
+                  ]}
                 >
                   {item.artist}
                 </Text>
               </View>
 
-              <Text style={[styles.duration, { color: colors.textMuted }]}>
+              <Text
+                style={[
+                  design.type.caption,
+                  {
+                    color: colors.textMuted,
+                    fontVariant: ['tabular-nums'],
+                    marginLeft: 8,
+                  },
+                ]}
+              >
                 {formatDuration(item.duration)}
               </Text>
             </Pressable>
@@ -220,15 +276,14 @@ export default function AlbumDetailScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+
   center: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
-    gap: 8,
+    gap: 4,
   },
-  msgTitle: { fontSize: 17, fontWeight: '700' },
-  mutedText: { fontSize: 14, textAlign: 'center' },
 
   topBar: {
     flexDirection: 'row',
@@ -250,7 +305,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginLeft: 8,
   },
-  topBarTitle: { fontSize: 14, fontWeight: '700' },
 
   headerBlock: {
     alignItems: 'center',
@@ -261,7 +315,6 @@ const styles = StyleSheet.create({
   art: {
     width: ART_SIZE,
     height: ART_SIZE,
-    borderRadius: 16,
     marginBottom: 20,
     shadowColor: '#000',
     shadowOpacity: 0.2,
@@ -269,10 +322,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 10 },
     elevation: 6,
   },
-  artPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 22, fontWeight: '800', textAlign: 'center' },
-  artist: { fontSize: 15, marginTop: 4, textAlign: 'center' },
-  meta: { fontSize: 12, marginTop: 6 },
 
   playAllBtn: {
     flexDirection: 'row',
@@ -281,24 +330,17 @@ const styles = StyleSheet.create({
     marginTop: 18,
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 26,
   },
-  playAllText: { fontWeight: '700', fontSize: 15 },
 
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 20,
-    paddingVertical: 12,
   },
-  numWrap: { width: 24, alignItems: 'center', justifyContent: 'center' },
-  trackNum: { fontSize: 13, fontVariant: ['tabular-nums'] },
-  trackTitle: { fontSize: 15, fontWeight: '600' },
-  trackArtist: { fontSize: 12, marginTop: 2 },
-  duration: {
-    fontSize: 12,
-    fontVariant: ['tabular-nums'],
-    marginLeft: 8,
+  numWrap: {
+    width: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
