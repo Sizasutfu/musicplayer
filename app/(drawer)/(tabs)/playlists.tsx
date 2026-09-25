@@ -18,14 +18,19 @@ import { router } from 'expo-router';
 import { usePlaylists } from '../../../hooks/usePlaylists';
 import { useLibrary } from '../../../hooks/useLibrary';
 import { useTheme } from '../../../context/ThemeContext';
-import { useMiniPlayerOffset } from '../../../hooks/useTabBarHeight';
 import MiniPlayer from '../../../components/MiniPlayer';
+
+// Mini player's own rendered height inside a tab screen: 40px artwork
+// + 10px top/bottom padding = 60px. Kept as a constant since MiniPlayer
+// sits at bottom: 0 here (flush on the tab bar) rather than offset by
+// tab bar height.
+const MINI_PLAYER_HEIGHT = 60;
+const FAB_GAP_ABOVE_MINI_PLAYER = 16;
 
 export default function PlaylistsScreen() {
   const { playlists, loaded, create, remove } = usePlaylists();
   const { songs } = useLibrary();
   const { colors, design } = useTheme();
-  const miniPlayerOffset = useMiniPlayerOffset();
 
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState('');
@@ -175,7 +180,7 @@ export default function PlaylistsScreen() {
           styles.fab,
           {
             backgroundColor: colors.primary,
-            bottom: miniPlayerOffset + 60,
+            bottom: MINI_PLAYER_HEIGHT + FAB_GAP_ABOVE_MINI_PLAYER,
             shadowColor: colors.fabShadow,
           },
           pressed && { opacity: 0.9, transform: [{ scale: 0.96 }] },
@@ -276,7 +281,7 @@ export default function PlaylistsScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      <MiniPlayer bottomOffset={miniPlayerOffset} />
+      <MiniPlayer bottomOffset={0} />
     </View>
   );
 }

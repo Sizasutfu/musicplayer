@@ -14,7 +14,6 @@ import { useLibrary, type Song } from '../../../hooks/useLibrary';
 import { usePlayer } from '../../../context/PlayerContext.stub';
 import { useFavorites } from '../../../hooks/useFavorites';
 import { useTheme } from '../../../context/ThemeContext';
-import { useMiniPlayerOffset } from '../../../hooks/useTabBarHeight';
 import MiniPlayer from '../../../components/MiniPlayer';
 import SongActionSheet from '../../../components/SongActionSheet';
 import LikeButton from '../../../components/LikeButton';
@@ -24,7 +23,6 @@ export default function FavoritesScreen() {
   const { favorites } = useFavorites();
   const { playQueue, currentTrack } = usePlayer();
   const { colors, design } = useTheme();
-  const miniPlayerOffset = useMiniPlayerOffset();
 
   const [actionSong, setActionSong] = useState<Song | null>(null);
 
@@ -180,7 +178,7 @@ export default function FavoritesScreen() {
         </>
       )}
 
-      <MiniPlayer bottomOffset={miniPlayerOffset} />
+      <MiniPlayer bottomOffset={0} />
 
       <SongActionSheet
         visible={!!actionSong}

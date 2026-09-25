@@ -25,7 +25,6 @@ import { useLibrary, type Song } from '../../../hooks/useLibrary';
 import { usePlayer } from '../../../context/PlayerContext.stub';
 import { useTheme } from '../../../context/ThemeContext';
 import { useProfile } from '../../../hooks/useProfile';
-import { useMiniPlayerOffset } from '../../../hooks/useTabBarHeight';
 import ProfileAvatar from '../../../components/ProfileAvatar';
 import MiniPlayer from '../../../components/MiniPlayer';
 import SongActionSheet from '../../../components/SongActionSheet';
@@ -75,7 +74,6 @@ export default function LibraryScreen() {
   const { playQueue, currentTrack } = usePlayer();
   const { colors, design } = useTheme();
   const navigation = useNavigation();
-  const miniPlayerOffset = useMiniPlayerOffset();
 
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -386,7 +384,7 @@ export default function LibraryScreen() {
         }
       />
 
-      <MiniPlayer bottomOffset={miniPlayerOffset} />
+      <MiniPlayer bottomOffset={0} />
 
       <SongActionSheet
         visible={!!actionSong}
