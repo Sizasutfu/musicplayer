@@ -14,7 +14,7 @@ import { Feather } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useLibrary, type Song } from '../../hooks/useLibrary';
 import { groupByAlbum } from '../../lib/metadata';
-import { usePlayer } from '../../context/PlayerContext.stub';
+import { usePlayer } from '../../context/PlayerContext';
 import { useTheme } from '../../context/ThemeContext';
 import MiniPlayer from '../../components/MiniPlayer';
 import SongActionSheet from '../../components/SongActionSheet';

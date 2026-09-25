@@ -4,7 +4,7 @@ import { View, Text, Pressable, StyleSheet, Image } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { usePlayer } from '../context/PlayerContext.stub';
+import { usePlayer } from '../context/PlayerContext';
 import { useTheme } from '../context/ThemeContext';
 
 type Props = {

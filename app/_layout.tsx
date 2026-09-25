@@ -13,7 +13,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { PlayerProvider } from '../context/PlayerContext.stub';
+import { PlayerProvider } from '../context/PlayerContext';
 import { ThemeProvider, useTheme } from '../context/ThemeContext';
 import { PlaylistsProvider } from '../context/PlaylistsContext';
 import { LibraryProvider } from '../context/LibraryContext';

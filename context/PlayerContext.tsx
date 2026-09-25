@@ -1,29 +1,24 @@
 // context/PlayerContext.tsx
 import React, {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
   useState,
-  useCallback,
 } from 'react';
-import TrackPlayer, {
-  Event,
-  State,
-  usePlaybackState,
-  useProgress,
-  useActiveTrack,
-  type Track,
-} from 'react-native-track-player';
-import { setupPlayer } from '../lib/trackPlayer';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import type { Song } from './LibraryContext';
 
 type PlayerContextValue = {
   ready: boolean;
-  currentTrack: Track | undefined;
+  currentTrack: Song | undefined;
+  queue: Song[];
+  queueIndex: number;
   isPlaying: boolean;
   progress: { position: number; duration: number; buffered: number };
-  playTrack: (track: Track, queue?: Track[]) => Promise<void>;
-  playQueue: (queue: Track[], startIndex?: number) => Promise<void>;
+  playTrack: (track: Song, queue?: Song[]) => Promise<void>;
+  playQueue: (queue: Song[], startIndex?: number) => Promise<void>;
   togglePlayPause: () => Promise<void>;
   next: () => Promise<void>;
   previous: () => Promise<void>;
@@ -33,81 +28,120 @@ type PlayerContextValue = {
 const PlayerContext = createContext<PlayerContextValue | null>(null);
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
+  // One player instance for the whole app. Tracks are swapped via
+  // player.replace(), which is cheaper than creating a new player per song.
+  const player = useAudioPlayer();
+  const status = useAudioPlayerStatus(player);
+
+  const [queue, setQueue] = useState<Song[]>([]);
+  const [queueIndex, setQueueIndex] = useState(-1);
+  const [currentTrack, setCurrentTrack] = useState<Song | undefined>();
   const [ready, setReady] = useState(false);
-  const playbackState = usePlaybackState();
-  const progress = useProgress(250);
-  const activeTrack = useActiveTrack();
 
   useEffect(() => {
-    setupPlayer()
-      .then(() => setReady(true))
-      .catch((e) => console.warn('TrackPlayer setup failed', e));
+    setReady(true);
   }, []);
 
-  const isPlaying =
-    playbackState.state === State.Playing ||
-    playbackState.state === State.Buffering ||
-    playbackState.state === State.Loading;
+  const loadAndPlay = useCallback(
+    async (song: Song, index: number, list: Song[]) => {
+      try {
+        setCurrentTrack(song);
+        setQueueIndex(index);
+        setQueue(list);
+        player.replace({ uri: song.url });
+        player.play();
+      } catch (e) {
+        console.warn('[Player] loadAndPlay failed:', e);
+      }
+    },
+    [player]
+  );
 
-  const playQueue = useCallback(async (queue: Track[], startIndex = 0) => {
-    if (!queue.length) return;
-    await TrackPlayer.reset();
-    await TrackPlayer.add(queue);
-    await TrackPlayer.skip(startIndex);
-    await TrackPlayer.play();
-  }, []);
+  const playQueue = useCallback(
+    async (list: Song[], startIndex = 0) => {
+      if (!list.length) return;
+      const idx = Math.max(0, Math.min(startIndex, list.length - 1));
+      await loadAndPlay(list[idx], idx, list);
+    },
+    [loadAndPlay]
+  );
 
   const playTrack = useCallback(
-    async (track: Track, queue?: Track[]) => {
-      if (queue && queue.length) {
-        const idx = queue.findIndex((t) => t.id === track.id);
-        return playQueue(queue, idx >= 0 ? idx : 0);
+    async (track: Song, list?: Song[]) => {
+      if (list && list.length) {
+        const idx = list.findIndex((t) => t.id === track.id);
+        await playQueue(list, idx >= 0 ? idx : 0);
+      } else {
+        await playQueue([track], 0);
       }
-      await TrackPlayer.reset();
-      await TrackPlayer.add(track);
-      await TrackPlayer.play();
     },
     [playQueue]
   );
 
   const togglePlayPause = useCallback(async () => {
-    if (isPlaying) await TrackPlayer.pause();
-    else await TrackPlayer.play();
-  }, [isPlaying]);
+    if (status.playing) player.pause();
+    else player.play();
+  }, [player, status.playing]);
 
   const next = useCallback(async () => {
-    try {
-      await TrackPlayer.skipToNext();
-      await TrackPlayer.play();
-    } catch {
-      // no next track
+    if (!queue.length) return;
+    const nextIndex = queueIndex + 1;
+    if (nextIndex >= queue.length) {
+      // End of queue — pause at the last track rather than looping.
+      player.pause();
+      return;
     }
-  }, []);
+    await loadAndPlay(queue[nextIndex], nextIndex, queue);
+  }, [queue, queueIndex, loadAndPlay, player]);
 
   const previous = useCallback(async () => {
-    const pos = await TrackPlayer.getPosition();
-    if (pos > 3) return TrackPlayer.seekTo(0);
-    try {
-      await TrackPlayer.skipToPrevious();
-      await TrackPlayer.play();
-    } catch {
-      await TrackPlayer.seekTo(0);
-    }
-  }, []);
+    if (!queue.length) return;
 
-  const seekTo = useCallback(async (seconds: number) => {
-    await TrackPlayer.seekTo(seconds);
-  }, []);
+    // Standard behaviour: if we're past 3s, restart the current track.
+    if ((status.currentTime ?? 0) > 3) {
+      await player.seekTo(0);
+      return;
+    }
+
+    const prevIndex = queueIndex - 1;
+    if (prevIndex < 0) {
+      await player.seekTo(0);
+      return;
+    }
+    await loadAndPlay(queue[prevIndex], prevIndex, queue);
+  }, [queue, queueIndex, status.currentTime, loadAndPlay, player]);
+
+  const seekTo = useCallback(
+    async (seconds: number) => {
+      try {
+        await player.seekTo(Math.max(0, seconds));
+      } catch (e) {
+        console.warn('[Player] seekTo failed:', e);
+      }
+    },
+    [player]
+  );
+
+  // Auto-advance when the current track finishes.
+  useEffect(() => {
+    if (status.didJustFinish) {
+      next();
+    }
+  }, [status.didJustFinish, next]);
+
+  const isPlaying = status.playing ?? false;
 
   const value = useMemo<PlayerContextValue>(
     () => ({
       ready,
-      currentTrack: activeTrack,
+      currentTrack,
+      queue,
+      queueIndex,
       isPlaying,
       progress: {
-        position: progress.position,
-        duration: progress.duration,
-        buffered: progress.buffered,
+        position: status.currentTime ?? 0,
+        duration: status.duration ?? currentTrack?.duration ?? 0,
+        buffered: 0,
       },
       playTrack,
       playQueue,
@@ -118,9 +152,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }),
     [
       ready,
-      activeTrack,
+      currentTrack,
+      queue,
+      queueIndex,
       isPlaying,
-      progress,
+      status.currentTime,
+      status.duration,
       playTrack,
       playQueue,
       togglePlayPause,

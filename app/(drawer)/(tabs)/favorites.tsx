@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLibrary, type Song } from '../../../hooks/useLibrary';
-import { usePlayer } from '../../../context/PlayerContext.stub';
+import { usePlayer } from '../../../context/PlayerContext';
 import { useFavorites } from '../../../hooks/useFavorites';
 import { useTheme } from '../../../context/ThemeContext';
 import MiniPlayer from '../../../components/MiniPlayer';

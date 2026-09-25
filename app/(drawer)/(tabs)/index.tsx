@@ -22,7 +22,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, router } from 'expo-router';
 import { DrawerActions } from '@react-navigation/native';
 import { useLibrary, type Song } from '../../../hooks/useLibrary';
-import { usePlayer } from '../../../context/PlayerContext.stub';
+import { usePlayer } from '../../../context/PlayerContext';
 import { useTheme } from '../../../context/ThemeContext';
 import { useProfile } from '../../../hooks/useProfile';
 import ProfileAvatar from '../../../components/ProfileAvatar';
