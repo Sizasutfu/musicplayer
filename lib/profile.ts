@@ -18,12 +18,15 @@ export const AVATAR_COLORS = [
   '#06b6d4', // cyan
   '#ef4444', // red
   '#8b5cf6', // purple
+  '#90adee',
+  '#90edea',
+  '#93cdaa',
 ];
 
 export const DEFAULT_PROFILE: Profile = {
-  name: 'Music Lover',
-  username: 'you',
-  bio: 'Just here for the music.',
+  name: 'music lover',
+  username: 'username',
+  bio: 'i love music',
   avatarColor: AVATAR_COLORS[0],
   joinedAt: Date.now(),
 };

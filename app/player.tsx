@@ -15,6 +15,7 @@ import { usePlayer } from '../context/PlayerContext.stub';
 import { useTheme } from '../context/ThemeContext';
 import SeekBar from '../components/SeekBar';
 import LikeButton from '../components/LikeButton';
+import WaveformVisualizer from '../components/WaveformVisualizer';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ART_SIZE = Math.min(SCREEN_WIDTH - 64, 340);
@@ -100,7 +101,7 @@ export default function PlayerScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Album art */}
+        {/* Album art with waveform overlay */}
         <View style={styles.artWrap}>
           <View
             style={[
@@ -112,6 +113,16 @@ export default function PlayerScreen() {
             ]}
           >
             <Feather name="music" size={72} color={colors.iconMuted} />
+
+            {/* Waveform lives at the bottom of the artwork */}
+            <View style={styles.waveWrap} pointerEvents="none">
+              <WaveformVisualizer
+                playing={isPlaying}
+                color={colors.primary}
+                height={72}
+                opacity={0.9}
+              />
+            </View>
           </View>
         </View>
 
@@ -261,11 +272,18 @@ const styles = StyleSheet.create({
     height: ART_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOpacity: 0.25,
     shadowRadius: 24,
     shadowOffset: { width: 0, height: 12 },
     elevation: 8,
+  },
+  waveWrap: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 16,
   },
 
   infoRow: {
