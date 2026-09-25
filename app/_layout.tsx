@@ -7,6 +7,8 @@ LogBox.ignoreLogs([
   'Method getInfoAsync imported from "expo-file-system" is deprecated',
 ]);
 
+import React, { useEffect, useState } from 'react';
+import { View, ActivityIndicator } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -16,13 +18,46 @@ import { ThemeProvider, useTheme } from '../context/ThemeContext';
 import { PlaylistsProvider } from '../context/PlaylistsContext';
 import { LibraryProvider } from '../context/LibraryContext';
 import { FavoritesProvider } from '../context/FavoritesContext';
+import { hasSeenOnboarding } from '../lib/onboarding';
 
 function ThemedStack() {
   const { colors, isDark } = useTheme();
+  const [onboarded, setOnboarded] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    hasSeenOnboarding()
+      .then((seen) => {
+        if (mounted) setOnboarded(seen);
+      })
+      .catch(() => {
+        if (mounted) setOnboarded(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  if (onboarded === null) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: colors.background,
+        }}
+      >
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
   return (
     <>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <Stack
+        initialRouteName={onboarded ? '(drawer)' : 'welcome'}
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: colors.background },

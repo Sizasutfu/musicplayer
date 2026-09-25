@@ -9,6 +9,11 @@ export type Settings = {
   crossfade: boolean;
   normalizeVolume: boolean;
   showHiddenFiles: boolean;
+  /**
+   * Hide songs shorter than this many seconds.
+   * 0 = show everything. 60 = hide anything under 1 minute.
+   */
+  minSongDuration: number;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -19,6 +24,7 @@ export const DEFAULT_SETTINGS: Settings = {
   crossfade: false,
   normalizeVolume: false,
   showHiddenFiles: false,
+  minSongDuration: 0,
 };
 
 const SETTINGS_PATH = FileSystem.documentDirectory + 'settings.json';
@@ -28,7 +34,10 @@ export async function loadSettings(): Promise<Settings> {
     const info = await FileSystem.getInfoAsync(SETTINGS_PATH);
     if (!info.exists) return DEFAULT_SETTINGS;
     const raw = await FileSystem.readAsStringAsync(SETTINGS_PATH);
-    return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<Settings>) };
+    return {
+      ...DEFAULT_SETTINGS,
+      ...(JSON.parse(raw) as Partial<Settings>),
+    };
   } catch {
     return DEFAULT_SETTINGS;
   }

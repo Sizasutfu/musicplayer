@@ -17,6 +17,7 @@ import {
   getCached,
   setCached,
 } from '../lib/metadata';
+import { useTheme } from './ThemeContext';
 
 export type Song = Track & TrackMetadata & {
   id: string;
@@ -26,6 +27,8 @@ export type Song = Track & TrackMetadata & {
 
 type LibraryContextValue = {
   songs: Song[];
+  /** Every song from the device, unfiltered. Rarely needed — mostly for diagnostics. */
+  allSongs: Song[];
   loading: boolean;
   granting: boolean;
   enriching: boolean;
@@ -37,7 +40,9 @@ type LibraryContextValue = {
 const LibraryContext = createContext<LibraryContextValue | null>(null);
 
 export function LibraryProvider({ children }: { children: React.ReactNode }) {
-  const [songs, setSongs] = useState<Song[]>([]);
+  const { settings } = useTheme();
+
+  const [allSongs, setAllSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
   const [granting, setGranting] = useState(false);
   const [enriching, setEnriching] = useState(false);
@@ -47,7 +52,6 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
   const cancelled = useRef(false);
 
   const load = useCallback(async () => {
-    // Cancel any in-flight load
     cancelled.current = true;
     await new Promise((r) => setTimeout(r, 0));
     cancelled.current = false;
@@ -64,7 +68,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
       if (!perm.granted) {
         if (cancelled.current) return;
         setGranted(false);
-        setSongs([]);
+        setAllSongs([]);
         setLoading(false);
         return;
       }
@@ -90,7 +94,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (cancelled.current) return;
-      setSongs(fast);
+      setAllSongs(fast);
       setLoading(false);
       setEnriching(true);
 
@@ -103,7 +107,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
       );
 
       if (cancelled.current) return;
-      setSongs(withCache);
+      setAllSongs(withCache);
 
       // Step 3: extract ID3 tags for uncached tracks
       const uncached = withCache.filter(
@@ -119,7 +123,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
         await setCached(song.url, merged);
 
         if (cancelled.current) return;
-        setSongs((prev) =>
+        setAllSongs((prev) =>
           prev.map((p) => (p.id === song.id ? { ...p, ...merged } : p))
         );
       }
@@ -142,9 +146,24 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
     };
   }, [load]);
 
+  // ── Filter applied on top of the raw list ────────────────
+  // Pure derivation — changing the setting in Settings re-runs this
+  // without rescanning the device.
+  const songs = useMemo(() => {
+    const min = settings.minSongDuration;
+    if (!min || min <= 0) return allSongs;
+
+    return allSongs.filter((s) => {
+      // Keep songs with unknown duration — we can't know if they're short.
+      if (s.duration === undefined || s.duration === null) return true;
+      return s.duration >= min;
+    });
+  }, [allSongs, settings.minSongDuration]);
+
   const value = useMemo<LibraryContextValue>(
     () => ({
       songs,
+      allSongs,
       loading,
       granting,
       enriching,
@@ -152,7 +171,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
       error,
       refresh: load,
     }),
-    [songs, loading, granting, enriching, granted, error, load]
+    [songs, allSongs, loading, granting, enriching, granted, error, load]
   );
 
   return (
@@ -169,5 +188,4 @@ export function useLibrary() {
   return ctx;
 }
 
-// Re-export Song type so old imports still work
 export type { Song as LibrarySong };

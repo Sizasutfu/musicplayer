@@ -1,4 +1,4 @@
-// app/(drawer)/settings.tsx
+// app/(drawer)/(tabs)/settings.tsx
 import React, { useState } from 'react';
 import {
   View,
@@ -8,6 +8,7 @@ import {
   Switch,
   StyleSheet,
   Alert,
+  Modal,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,16 +18,33 @@ import { useTheme } from '../../../context/ThemeContext';
 import { clearCache } from '../../../lib/metadata';
 import { resetOnboarding } from '../../../lib/onboarding';
 import { useLibrary } from '../../../hooks/useLibrary';
+import MiniPlayer from '../../../components/MiniPlayer';
 
 type IconName = React.ComponentProps<typeof Feather>['name'];
 type Colors = ReturnType<typeof useTheme>['colors'];
 type Design = ReturnType<typeof useTheme>['design'];
+
+const DURATION_OPTIONS: { label: string; description: string; value: number }[] = [
+  { label: 'Show all songs', description: 'No filter', value: 0 },
+  { label: 'Under 30 seconds', description: 'Hide short intros and clips', value: 30 },
+  { label: 'Under 1 minute', description: 'Hide short clips', value: 60 },
+  { label: 'Under 2 minutes', description: 'Only longer tracks', value: 120 },
+  { label: 'Under 5 minutes', description: 'Only full-length songs', value: 300 },
+];
+
+function describeDuration(value: number): string {
+  if (value <= 0) return 'Off — show all songs';
+  if (value < 60) return `Hide under ${value} seconds`;
+  const m = value / 60;
+  return `Hide under ${m} ${m === 1 ? 'minute' : 'minutes'}`;
+}
 
 export default function SettingsScreen() {
   const { settings, colors, design, updateSetting, resetSettings, loaded } =
     useTheme();
   const { refresh, songs } = useLibrary();
   const [busy, setBusy] = useState<string | null>(null);
+  const [durationOpen, setDurationOpen] = useState(false);
 
   const runClearCache = async () => {
     setBusy('clear-cache');
@@ -64,16 +82,20 @@ export default function SettingsScreen() {
   };
 
   const runShowWelcome = () => {
-    Alert.alert('Show welcome screen?', 'You will be taken back to onboarding.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Show',
-        onPress: async () => {
-          await resetOnboarding();
-          router.replace('/welcome');
+    Alert.alert(
+      'Show welcome screen?',
+      'You will be taken back to onboarding.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Show',
+          onPress: async () => {
+            await resetOnboarding();
+            router.replace('/welcome');
+          },
         },
-      },
-    ]);
+      ]
+    );
   };
 
   if (!loaded) {
@@ -100,12 +122,7 @@ export default function SettingsScreen() {
               Theme
             </RowLabel>
           </Row>
-          <View
-            style={[
-              styles.segmentRow,
-              { gap: 8, paddingHorizontal: 14, paddingBottom: 14 },
-            ]}
-          >
+          <View style={styles.segmentRow}>
             {(['system', 'light', 'dark'] as const).map((mode) => {
               const active = settings.theme === mode;
               return (
@@ -172,6 +189,14 @@ export default function SettingsScreen() {
 
         <Section title="Library" colors={colors} design={design}>
           <ActionRow
+            icon="filter"
+            label="Hide short songs"
+            description={describeDuration(settings.minSongDuration)}
+            onPress={() => setDurationOpen(true)}
+            colors={colors}
+            design={design}
+          />
+          <ActionRow
             icon="refresh-cw"
             label="Rescan library"
             description="Look for new audio files"
@@ -236,10 +261,122 @@ export default function SettingsScreen() {
           />
         </Section>
 
-        <Text style={[design.type.caption, { color: colors.textMuted, textAlign: 'center', marginTop: 32 }]}>
+        <Text
+          style={[
+            design.type.caption,
+            {
+              color: colors.textMuted,
+              textAlign: 'center',
+              marginTop: 32,
+            },
+          ]}
+        >
           Made with React Native + Expo
         </Text>
       </ScrollView>
+
+      {/* ── Duration picker modal ───────────────────────── */}
+      <Modal
+        visible={durationOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDurationOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setDurationOpen(false)}
+          />
+          <View
+            style={[
+              design.card,
+              styles.modalCard,
+              { backgroundColor: colors.surface },
+            ]}
+          >
+            <Text
+              style={[
+                design.type.heading,
+                { color: colors.text, marginBottom: 4 },
+              ]}
+            >
+              Hide short songs
+            </Text>
+            <Text
+              style={[
+                design.type.caption,
+                { color: colors.textSecondary, marginBottom: 16 },
+              ]}
+            >
+              Songs below this duration won't appear in your library.
+            </Text>
+
+            {DURATION_OPTIONS.map((opt, i) => {
+              const active = settings.minSongDuration === opt.value;
+              const isLast = i === DURATION_OPTIONS.length - 1;
+              return (
+                <Pressable
+                  key={opt.value}
+                  onPress={() => {
+                    updateSetting('minSongDuration', opt.value);
+                    setDurationOpen(false);
+                  }}
+                  style={({ pressed }) => [
+                    styles.optionRow,
+                    !isLast && {
+                      borderBottomWidth: StyleSheet.hairlineWidth,
+                      borderBottomColor: colors.borderSubtle,
+                    },
+                    pressed && { backgroundColor: colors.surfaceElevated },
+                  ]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={[
+                        design.type.body,
+                        {
+                          color: active ? colors.primary : colors.text,
+                          fontWeight: active ? '700' : '600',
+                        },
+                      ]}
+                    >
+                      {opt.label}
+                    </Text>
+                    <Text
+                      style={[
+                        design.type.caption,
+                        { color: colors.textMuted, marginTop: 2 },
+                      ]}
+                    >
+                      {opt.description}
+                    </Text>
+                  </View>
+                  {active && (
+                    <Feather name="check" size={20} color={colors.primary} />
+                  )}
+                </Pressable>
+              );
+            })}
+
+            <Pressable
+              onPress={() => setDurationOpen(false)}
+              style={[
+                styles.modalBtn,
+                {
+                  backgroundColor: colors.chipBg,
+                  borderRadius: design.radius.item,
+                },
+              ]}
+            >
+              <Text style={[design.type.body, { color: colors.text }]}>
+                Cancel
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <MiniPlayer bottomOffset={0} />
     </SafeAreaView>
   );
 }
@@ -295,10 +432,11 @@ function Row({
     <View
       style={[
         styles.row,
-        !noDivider && design.showRowDividers && {
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: colors.borderSubtle,
-        },
+        !noDivider &&
+          design.showRowDividers && {
+            borderBottomWidth: StyleSheet.hairlineWidth,
+            borderBottomColor: colors.borderSubtle,
+          },
       ]}
     >
       {children}
@@ -384,10 +522,11 @@ function ToggleRow({
     <View
       style={[
         styles.row,
-        !last && design.showRowDividers && {
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: colors.borderSubtle,
-        },
+        !last &&
+          design.showRowDividers && {
+            borderBottomWidth: StyleSheet.hairlineWidth,
+            borderBottomColor: colors.borderSubtle,
+          },
       ]}
     >
       <RowIcon name={icon} colors={colors} design={design} />
@@ -444,10 +583,11 @@ function ActionRow({
       disabled={disabled}
       style={({ pressed }) => [
         styles.row,
-        !last && design.showRowDividers && {
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: colors.borderSubtle,
-        },
+        !last &&
+          design.showRowDividers && {
+            borderBottomWidth: StyleSheet.hairlineWidth,
+            borderBottomColor: colors.borderSubtle,
+          },
         pressed && onPress && { opacity: 0.6 },
       ]}
     >
@@ -484,7 +624,7 @@ function ActionRow({
 const styles = StyleSheet.create({
   root: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  content: { paddingTop: 8, paddingBottom: 40 },
+  content: { paddingTop: 8, paddingBottom: 200 },
   section: {},
   card: {
     marginHorizontal: 16,
@@ -506,10 +646,41 @@ const styles = StyleSheet.create({
   },
   segmentRow: {
     flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingBottom: 14,
   },
   segment: {
     flex: 1,
     paddingVertical: 9,
+    alignItems: 'center',
+  },
+
+  modalOverlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalCard: {
+    width: '86%',
+    maxWidth: 420,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+  },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    gap: 12,
+  },
+  modalBtn: {
+    marginTop: 14,
+    paddingVertical: 13,
     alignItems: 'center',
   },
 });
