@@ -75,12 +75,12 @@ export const LIGHT: ThemeColors = {
   chipBgActive: '#0a63ff',
   chipTextActive: '#ffffff',
   artPlaceholder: '#eceff1',
-  // Light mini player — light surface, dark text, subtle border
-  miniPlayerBg: '#ffffff',
-  miniPlayerText: '#111111',
-  miniPlayerTextSecondary: '#666666',
-  miniPlayerBtnBg: 'rgba(0,0,0,0.05)',
-  miniPlayerBorder: '#e5e7eb',
+  // Light mode: mini player is DARK — contrasts against the white page.
+  miniPlayerBg: '#111111',
+  miniPlayerText: '#ffffff',
+  miniPlayerTextSecondary: 'rgba(255,255,255,0.65)',
+  miniPlayerBtnBg: 'rgba(255,255,255,0.08)',
+  miniPlayerBorder: 'transparent',
   fabShadow: '#0a63ff',
 };
 
@@ -107,11 +107,11 @@ export const DARK: ThemeColors = {
   chipBgActive: '#3b82f6',
   chipTextActive: '#ffffff',
   artPlaceholder: '#27272a',
-  // Dark mini player — dark elevated surface, light text, no border
-  miniPlayerBg: '#1c1c1f',
-  miniPlayerText: '#f4f4f5',
-  miniPlayerTextSecondary: 'rgba(255,255,255,0.6)',
-  miniPlayerBtnBg: 'rgba(255,255,255,0.08)',
+  // Dark mode: mini player is LIGHT — contrasts against the dark page.
+  miniPlayerBg: '#f4f4f5',
+  miniPlayerText: '#111111',
+  miniPlayerTextSecondary: 'rgba(0,0,0,0.6)',
+  miniPlayerBtnBg: 'rgba(0,0,0,0.06)',
   miniPlayerBorder: 'transparent',
   fabShadow: '#000000',
 };
@@ -183,7 +183,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       updateSetting,
       resetSettings,
     }),
-    [settings, colors, design, isDark, loaded, setTheme, updateSetting, resetSettings]
+    [
+      settings,
+      colors,
+      design,
+      isDark,
+      loaded,
+      setTheme,
+      updateSetting,
+      resetSettings,
+    ]
   );
 
   return (
