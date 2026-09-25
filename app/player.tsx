@@ -1,5 +1,5 @@
 // app/player.tsx
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -23,9 +23,10 @@ const ART_SIZE = Math.min(SCREEN_WIDTH - 64, 340);
 
 function formatTime(seconds: number) {
   if (!seconds || isNaN(seconds)) return '0:00';
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, '0')}`;
+  const s = Math.max(0, Math.floor(seconds));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${r.toString().padStart(2, '0')}`;
 }
 
 export default function PlayerScreen() {
@@ -43,11 +44,42 @@ export default function PlayerScreen() {
   const [seeking, setSeeking] = useState(false);
   const [scrubPosition, setScrubPosition] = useState(0);
 
-  const displayPosition = seeking ? scrubPosition : progress.position;
+  // ── Smooth position ─────────────────────────────────────
+  // Instead of a self-incrementing counter (which stalls or jumps
+  // whenever a tick lands late), we anchor a {position, timestamp}
+  // pair to the last known-real position and derive the displayed
+  // position from the wall clock each tick. A late or delayed tick
+  // just computes a slightly larger elapsed time — it never stalls,
+  // and it can't drift out of sync with a second independent timer.
+  const [smoothPosition, setSmoothPosition] = useState(0);
+  const baseRef = useRef({ position: 0, timestamp: Date.now() });
+
   const duration = currentTrack?.duration ?? progress.duration ?? 0;
 
-  // Artwork lives on the Song object flowing through the player context,
-  // even though the stub's Track type doesn't declare it.
+  // Re-anchor whenever the real reported position updates (track change,
+  // seek, or the player's own periodic status tick) — but not while the
+  // user is actively scrubbing.
+  useEffect(() => {
+    if (seeking) return;
+    baseRef.current = { position: progress.position, timestamp: Date.now() };
+    setSmoothPosition(progress.position);
+  }, [progress.position, seeking, currentTrack?.id]);
+
+  // Recompute from the anchor every 250ms. Sub-second resolution means
+  // the whole-second display advances right when it crosses a boundary
+  // instead of waiting on a full 1s tick, which is what reads as "smooth".
+  useEffect(() => {
+    if (!isPlaying || seeking) return;
+    const id = setInterval(() => {
+      const elapsed = (Date.now() - baseRef.current.timestamp) / 1000;
+      const next = baseRef.current.position + elapsed;
+      setSmoothPosition(duration > 0 ? Math.min(next, duration) : next);
+    }, 250);
+    return () => clearInterval(id);
+  }, [isPlaying, seeking, duration]);
+
+  const displayPosition = seeking ? scrubPosition : smoothPosition;
+
   const artwork = (currentTrack as any)?.artwork as string | undefined;
 
   const handleSeek = (seconds: number) => {
@@ -56,6 +88,8 @@ export default function PlayerScreen() {
 
   const setSeekTo = async (seconds: number) => {
     setScrubPosition(seconds);
+    setSmoothPosition(seconds);
+    baseRef.current = { position: seconds, timestamp: Date.now() };
     await seekTo(seconds);
   };
 
@@ -127,7 +161,6 @@ export default function PlayerScreen() {
               <Feather name="music" size={72} color={colors.iconMuted} />
             )}
 
-            {/* Waveform lives at the bottom of the artwork */}
             <View style={styles.waveWrap} pointerEvents="none">
               <WaveformVisualizer
                 playing={isPlaying}
