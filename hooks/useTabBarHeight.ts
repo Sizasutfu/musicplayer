@@ -1,24 +1,15 @@
 // hooks/useTabBarHeight.ts
-import { Platform } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-const BASE_HEIGHT = Platform.OS === 'ios' ? 50 : 56;
-const GAP = 4; // space between the tab bar and the mini player
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 
 /**
- * Returns the correct `bottomOffset` value for the MiniPlayer on tab screens.
- * Value = tab bar height + OS gesture inset + small gap.
+ * Returns the actual rendered tab bar height, as measured by React
+ * Navigation. Use this as the `bottomOffset` for the MiniPlayer on tab
+ * screens — it accounts for safe area insets, padding, and any future
+ * tab bar style changes without manual math.
+ *
+ * Only callable from a screen that is a child of the Tabs navigator.
  */
 export function useMiniPlayerOffset() {
-  const insets = useSafeAreaInsets();
-  return BASE_HEIGHT + insets.bottom + GAP;
-}
-
-/**
- * Raw tab bar height (without the mini player gap). Use if you need to
- * position something else above the tab bar.
- */
-export function useTabBarHeight() {
-  const insets = useSafeAreaInsets();
-  return BASE_HEIGHT + insets.bottom;
+  const tabBarHeight = useBottomTabBarHeight();
+  return tabBarHeight;
 }

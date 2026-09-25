@@ -11,7 +11,7 @@ export default function Index() {
   useEffect(() => {
     if (!loaded) return;
     hasSeenOnboarding().then((seen) => {
-      if (seen) router.replace('/(drawer)');
+      if (seen) router.replace('/');
       else router.replace('/welcome');
     });
   }, [loaded]);
