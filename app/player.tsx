@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Dimensions,
   ScrollView,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -44,6 +45,10 @@ export default function PlayerScreen() {
 
   const displayPosition = seeking ? scrubPosition : progress.position;
   const duration = currentTrack?.duration ?? progress.duration ?? 0;
+
+  // Artwork lives on the Song object flowing through the player context,
+  // even though the stub's Track type doesn't declare it.
+  const artwork = (currentTrack as any)?.artwork as string | undefined;
 
   const handleSeek = (seconds: number) => {
     setSeekTo(seconds);
@@ -112,7 +117,15 @@ export default function PlayerScreen() {
               },
             ]}
           >
-            <Feather name="music" size={72} color={colors.iconMuted} />
+            {artwork ? (
+              <Image
+                source={{ uri: artwork }}
+                style={styles.artImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <Feather name="music" size={72} color={colors.iconMuted} />
+            )}
 
             {/* Waveform lives at the bottom of the artwork */}
             <View style={styles.waveWrap} pointerEvents="none">
@@ -278,6 +291,9 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     shadowOffset: { width: 0, height: 12 },
     elevation: 8,
+  },
+  artImage: {
+    ...StyleSheet.absoluteFillObject,
   },
   waveWrap: {
     position: 'absolute',

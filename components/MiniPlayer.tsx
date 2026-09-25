@@ -1,6 +1,6 @@
 // components/MiniPlayer.tsx
 import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Image } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,11 +8,6 @@ import { usePlayer } from '../context/PlayerContext.stub';
 import { useTheme } from '../context/ThemeContext';
 
 type Props = {
-  /**
-   * Extra space below the mini player. Inside a tab navigator, pass the
-   * tab bar height + 12 so it sits above the tab bar. Outside tabs,
-   * leave undefined and the OS gesture bar inset is applied automatically.
-   */
   bottomOffset?: number;
 };
 
@@ -26,6 +21,8 @@ export default function MiniPlayer({ bottomOffset }: Props) {
   const bottom =
     bottomOffset !== undefined ? bottomOffset : insets.bottom + 12;
 
+  const artwork = (currentTrack as any).artwork as string | undefined;
+
   return (
     <Pressable
       style={[
@@ -38,17 +35,32 @@ export default function MiniPlayer({ bottomOffset }: Props) {
       ]}
       onPress={() => router.push('/player')}
     >
-      <View
-        style={[
-          styles.art,
-          {
-            backgroundColor: colors.miniPlayerBtnBg,
-            borderRadius: design.radius.item - 2,
-          },
-        ]}
-      >
-        <Feather name="music" size={18} color={colors.miniPlayerText} />
-      </View>
+      {artwork ? (
+        <Image
+          source={{ uri: artwork }}
+          style={[
+            styles.art,
+            {
+              borderRadius: design.radius.item - 2,
+              backgroundColor: colors.miniPlayerBtnBg,
+            },
+          ]}
+        />
+      ) : (
+        <View
+          style={[
+            styles.art,
+            {
+              backgroundColor: colors.miniPlayerBtnBg,
+              borderRadius: design.radius.item - 2,
+              alignItems: 'center',
+              justifyContent: 'center',
+            },
+          ]}
+        >
+          <Feather name="music" size={18} color={colors.miniPlayerText} />
+        </View>
+      )}
 
       <View style={{ flex: 1 }}>
         <Text
@@ -118,8 +130,6 @@ const styles = StyleSheet.create({
   art: {
     width: 40,
     height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   iconBtn: {
     width: 34,
