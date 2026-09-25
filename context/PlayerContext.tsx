@@ -30,7 +30,7 @@ const PlayerContext = createContext<PlayerContextValue | null>(null);
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // One player instance for the whole app. Tracks are swapped via
   // player.replace(), which is cheaper than creating a new player per song.
-  const player = useAudioPlayer();
+  const player = useAudioPlayer(undefined, { updateInterval: 1000 });
   const status = useAudioPlayerStatus(player);
 
   const [queue, setQueue] = useState<Song[]>([]);
