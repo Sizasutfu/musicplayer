@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "musicplayer",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "ios": {
       "bundleIdentifier": "com.sizacode.MusicPlayer",
       "supportsTablet": true,
@@ -68,14 +68,9 @@
         }
       ],
       [
-        "expo-build-properties",
+        "expo-audio",
         {
-          "android": {
-            "newArchEnabled": false
-          },
-          "ios": {
-            "newArchEnabled": false
-          }
+          "enableBackgroundPlayback": true
         }
       ],
       "expo-asset"

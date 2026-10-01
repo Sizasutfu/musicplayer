@@ -7,7 +7,11 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import {
+  setAudioModeAsync,
+  useAudioPlayer,
+  useAudioPlayerStatus,
+} from 'expo-audio';
 import type { Song } from './LibraryContext';
 
 type PlayerContextValue = {
@@ -28,9 +32,7 @@ type PlayerContextValue = {
 const PlayerContext = createContext<PlayerContextValue | null>(null);
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
-  // One player instance for the whole app. Tracks are swapped via
-  // player.replace(), which is cheaper than creating a new player per song.
-  const player = useAudioPlayer(undefined, { updateInterval: 1000 });
+  const player = useAudioPlayer();
   const status = useAudioPlayerStatus(player);
 
   const [queue, setQueue] = useState<Song[]>([]);
@@ -38,8 +40,18 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [currentTrack, setCurrentTrack] = useState<Song | undefined>();
   const [ready, setReady] = useState(false);
 
+  // ── Configure the audio session once ────────────────────
   useEffect(() => {
-    setReady(true);
+    setAudioModeAsync({
+      playsInSilentMode: true,
+      shouldPlayInBackground: true,
+      interruptionMode: 'doNotMix',
+    })
+      .then(() => setReady(true))
+      .catch((e) => {
+        console.warn('[Player] setAudioMode failed:', e);
+        setReady(true); // still proceed, in-app playback works
+      });
   }, []);
 
   const loadAndPlay = useCallback(
@@ -50,6 +62,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         setQueue(list);
         player.replace({ uri: song.url });
         player.play();
+
+        // Lock screen / notification metadata
+        try {
+          player.setActiveForLockScreen(true, {
+            title: song.title,
+            artist: song.artist,
+            albumTitle: song.album ?? '',
+            artworkUrl: song.artwork,
+          });
+        } catch (e) {
+          // Lock screen metadata is best-effort; ignore failures
+          console.warn('[Player] setActiveForLockScreen failed:', e);
+        }
       } catch (e) {
         console.warn('[Player] loadAndPlay failed:', e);
       }
@@ -87,7 +112,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (!queue.length) return;
     const nextIndex = queueIndex + 1;
     if (nextIndex >= queue.length) {
-      // End of queue — pause at the last track rather than looping.
       player.pause();
       return;
     }
@@ -97,7 +121,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const previous = useCallback(async () => {
     if (!queue.length) return;
 
-    // Standard behaviour: if we're past 3s, restart the current track.
     if ((status.currentTime ?? 0) > 3) {
       await player.seekTo(0);
       return;
@@ -122,7 +145,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     [player]
   );
 
-  // Auto-advance when the current track finishes.
+  // Auto-advance when a track finishes
   useEffect(() => {
     if (status.didJustFinish) {
       next();
