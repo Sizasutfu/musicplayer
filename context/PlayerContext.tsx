@@ -7,7 +7,17 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import TrackPlayer, {
+  AppKilledPlaybackBehavior,
+  Capability,
+  Event,
+  RepeatMode,
+  State,
+  useActiveTrack,
+  usePlaybackState,
+  useProgress,
+  useTrackPlayerEvents,
+} from 'react-native-track-player';
 import type { Song } from './LibraryContext';
 
 type PlayerContextValue = {
@@ -27,41 +37,96 @@ type PlayerContextValue = {
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
 
-export function PlayerProvider({ children }: { children: React.ReactNode }) {
-  // One player instance for the whole app. Tracks are swapped via
-  // player.replace(), which is cheaper than creating a new player per song.
-  const player = useAudioPlayer(undefined, { updateInterval: 1000 });
-  const status = useAudioPlayerStatus(player);
+let isSetup = false;
 
+async function setupPlayerOnce() {
+  if (isSetup) return;
+  try {
+    await TrackPlayer.setupPlayer({ autoHandleInterruptions: true });
+  } catch (e: any) {
+    if (!e?.message?.includes('already')) throw e;
+  }
+
+  await TrackPlayer.updateOptions({
+    android: {
+      appKilledPlaybackBehavior: AppKilledPlaybackBehavior.ContinuePlayback,
+    },
+    capabilities: [
+      Capability.Play,
+      Capability.Pause,
+      Capability.SkipToNext,
+      Capability.SkipToPrevious,
+      Capability.SeekTo,
+      Capability.Stop,
+    ],
+    compactCapabilities: [
+      Capability.Play,
+      Capability.Pause,
+      Capability.SkipToNext,
+      Capability.SkipToPrevious,
+    ],
+    notificationCapabilities: [
+      Capability.Play,
+      Capability.Pause,
+      Capability.SkipToNext,
+      Capability.SkipToPrevious,
+      Capability.SeekTo,
+      Capability.Stop,
+    ],
+    progressUpdateEventInterval: 1,
+  });
+
+  await TrackPlayer.setRepeatMode(RepeatMode.Off);
+  isSetup = true;
+}
+
+export function PlayerProvider({ children }: { children: React.ReactNode }) {
+  const playbackState = usePlaybackState();
+  const progress = useProgress(1000);
+  const activeTrack = useActiveTrack();
+
+  const [ready, setReady] = useState(false);
   const [queue, setQueue] = useState<Song[]>([]);
   const [queueIndex, setQueueIndex] = useState(-1);
-  const [currentTrack, setCurrentTrack] = useState<Song | undefined>();
-  const [ready, setReady] = useState(false);
 
+  // ── One-time setup ─────────────────────────────────────
   useEffect(() => {
-    setReady(true);
+    setupPlayerOnce()
+      .then(() => setReady(true))
+      .catch((e) => console.warn('[Player] setup failed:', e));
   }, []);
 
-  const loadAndPlay = useCallback(
-    async (song: Song, index: number, list: Song[]) => {
-      try {
-        setCurrentTrack(song);
-        setQueueIndex(index);
-        setQueue(list);
-        player.replace({ uri: song.url });
-        player.play();
-      } catch (e) {
-        console.warn('[Player] loadAndPlay failed:', e);
-      }
-    },
-    [player]
-  );
+  // ── Track changes from lock screen / notification ──────
+  useTrackPlayerEvents([Event.PlaybackActiveTrackChanged], async () => {
+    try {
+      const idx = await TrackPlayer.getActiveTrackIndex();
+      if (typeof idx === 'number') setQueueIndex(idx);
+    } catch {
+      // ignore
+    }
+  });
+
+  const isPlaying =
+    playbackState.state === State.Playing ||
+    playbackState.state === State.Buffering ||
+    playbackState.state === State.Loading;
+
+  const currentTrack = (activeTrack as unknown as Song) || undefined;
+
+  const loadAndPlay = useCallback(async (list: Song[], index: number) => {
+    await TrackPlayer.reset();
+    await TrackPlayer.add(list as any);
+    await TrackPlayer.skip(index);
+    await TrackPlayer.play();
+    setQueue(list);
+    setQueueIndex(index);
+  }, []);
 
   const playQueue = useCallback(
     async (list: Song[], startIndex = 0) => {
       if (!list.length) return;
       const idx = Math.max(0, Math.min(startIndex, list.length - 1));
-      await loadAndPlay(list[idx], idx, list);
+      await loadAndPlay(list, idx);
     },
     [loadAndPlay]
   );
@@ -79,57 +144,40 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   );
 
   const togglePlayPause = useCallback(async () => {
-    if (status.playing) player.pause();
-    else player.play();
-  }, [player, status.playing]);
+    if (isPlaying) await TrackPlayer.pause();
+    else await TrackPlayer.play();
+  }, [isPlaying]);
 
   const next = useCallback(async () => {
-    if (!queue.length) return;
-    const nextIndex = queueIndex + 1;
-    if (nextIndex >= queue.length) {
-      // End of queue — pause at the last track rather than looping.
-      player.pause();
-      return;
+    try {
+      await TrackPlayer.skipToNext();
+      await TrackPlayer.play();
+    } catch {
+      await TrackPlayer.pause();
     }
-    await loadAndPlay(queue[nextIndex], nextIndex, queue);
-  }, [queue, queueIndex, loadAndPlay, player]);
+  }, []);
 
   const previous = useCallback(async () => {
-    if (!queue.length) return;
-
-    // Standard behaviour: if we're past 3s, restart the current track.
-    if ((status.currentTime ?? 0) > 3) {
-      await player.seekTo(0);
-      return;
-    }
-
-    const prevIndex = queueIndex - 1;
-    if (prevIndex < 0) {
-      await player.seekTo(0);
-      return;
-    }
-    await loadAndPlay(queue[prevIndex], prevIndex, queue);
-  }, [queue, queueIndex, status.currentTime, loadAndPlay, player]);
-
-  const seekTo = useCallback(
-    async (seconds: number) => {
-      try {
-        await player.seekTo(Math.max(0, seconds));
-      } catch (e) {
-        console.warn('[Player] seekTo failed:', e);
+    try {
+      const pos = await TrackPlayer.getPosition();
+      if (pos > 3) {
+        await TrackPlayer.seekTo(0);
+        return;
       }
-    },
-    [player]
-  );
-
-  // Auto-advance when the current track finishes.
-  useEffect(() => {
-    if (status.didJustFinish) {
-      next();
+      await TrackPlayer.skipToPrevious();
+      await TrackPlayer.play();
+    } catch {
+      await TrackPlayer.seekTo(0);
     }
-  }, [status.didJustFinish, next]);
+  }, []);
 
-  const isPlaying = status.playing ?? false;
+  const seekTo = useCallback(async (seconds: number) => {
+    try {
+      await TrackPlayer.seekTo(Math.max(0, seconds));
+    } catch (e) {
+      console.warn('[Player] seekTo failed:', e);
+    }
+  }, []);
 
   const value = useMemo<PlayerContextValue>(
     () => ({
@@ -139,9 +187,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       queueIndex,
       isPlaying,
       progress: {
-        position: status.currentTime ?? 0,
-        duration: status.duration ?? currentTrack?.duration ?? 0,
-        buffered: 0,
+        position: progress.position ?? 0,
+        duration: progress.duration ?? currentTrack?.duration ?? 0,
+        buffered: progress.buffered ?? 0,
       },
       playTrack,
       playQueue,
@@ -156,8 +204,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       queue,
       queueIndex,
       isPlaying,
-      status.currentTime,
-      status.duration,
+      progress.position,
+      progress.duration,
+      progress.buffered,
       playTrack,
       playQueue,
       togglePlayPause,
