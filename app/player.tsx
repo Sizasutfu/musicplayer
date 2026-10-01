@@ -29,6 +29,23 @@ function formatTime(seconds: number) {
   return `${m}:${r.toString().padStart(2, '0')}`;
 }
 
+// ── Wall-clock position tracker ──────────────────────────
+// Tracks playback time using only the system clock. Never reads
+// from the audio player during playback, which avoids the jitter
+// in expo-audio's position reporting.
+//
+// stateRef holds:
+//   trackId        - used to detect track changes
+//   baseSeconds    - seconds accumulated before the current segment
+//   segmentStart   - wall-clock time the current segment started
+//   wasPlaying     - previous isPlaying value, to detect flips
+type PositionState = {
+  trackId: string | undefined;
+  baseSeconds: number;
+  segmentStart: number;
+  wasPlaying: boolean;
+};
+
 export default function PlayerScreen() {
   const {
     currentTrack,
@@ -47,32 +64,63 @@ export default function PlayerScreen() {
 
   const [seeking, setSeeking] = useState(false);
   const [scrubPosition, setScrubPosition] = useState(0);
-  const [smoothPosition, setSmoothPosition] = useState(0);
-  const lastSyncRef = useRef<string | undefined>(undefined);
+  const [displaySecond, setDisplaySecond] = useState(0);
 
-  // Snap smooth position to real position on track change or big drift
+  const stateRef = useRef<PositionState>({
+    trackId: undefined,
+    baseSeconds: 0,
+    segmentStart: Date.now(),
+    wasPlaying: false,
+  });
+
+  // ── Anchor management ──────────────────────────────────
+  // Runs on track change and play/pause flip. Handles:
+  //   - New track → reset base to 0
+  //   - Resume    → start a new segment at current wall time
+  //   - Pause     → accumulate elapsed time into base
   useEffect(() => {
-    if (seeking) return;
-    const real = progress.position;
-    if (
-      currentTrack?.id !== lastSyncRef.current ||
-      Math.abs(smoothPosition - real) > 1.5
-    ) {
-      setSmoothPosition(real);
-      lastSyncRef.current = currentTrack?.id;
-    }
-  }, [progress.position, seeking, smoothPosition, currentTrack?.id]);
+    const s = stateRef.current;
+    const now = Date.now();
 
-  // Local 1-second ticker so the counter never stutters
+    // Track changed → full reset
+    if (currentTrack?.id !== s.trackId) {
+      s.trackId = currentTrack?.id;
+      s.baseSeconds = 0;
+      s.segmentStart = now;
+      s.wasPlaying = isPlaying;
+      setDisplaySecond(0);
+      return;
+    }
+
+    // Play/pause flip
+    if (isPlaying !== s.wasPlaying) {
+      if (isPlaying) {
+        // Just resumed → new segment begins now
+        s.segmentStart = now;
+      } else {
+        // Just paused → accumulate elapsed time
+        s.baseSeconds += (now - s.segmentStart) / 1000;
+      }
+      s.wasPlaying = isPlaying;
+    }
+  }, [currentTrack?.id, isPlaying]);
+
+  // ── Wall-clock ticker ──────────────────────────────────
+  // Runs only while playing and not scrubbing. Derives the display
+  // second from wall-clock elapsed time, never from the player.
   useEffect(() => {
     if (!isPlaying || seeking) return;
+
     const id = setInterval(() => {
-      setSmoothPosition((prev) => prev + 1);
-    }, 1000);
+      const s = stateRef.current;
+      const elapsed = (Date.now() - s.segmentStart) / 1000;
+      setDisplaySecond(Math.floor(s.baseSeconds + elapsed));
+    }, 250);
+
     return () => clearInterval(id);
   }, [isPlaying, seeking]);
 
-  const displayPosition = seeking ? scrubPosition : smoothPosition;
+  const displayPosition = seeking ? scrubPosition : displaySecond;
   const duration = currentTrack?.duration ?? progress.duration ?? 0;
 
   const artwork = (currentTrack as any)?.artwork as string | undefined;
@@ -82,8 +130,11 @@ export default function PlayerScreen() {
   };
 
   const setSeekTo = async (seconds: number) => {
+    const s = stateRef.current;
+    s.baseSeconds = seconds;
+    s.segmentStart = Date.now();
     setScrubPosition(seconds);
-    setSmoothPosition(seconds);
+    setDisplaySecond(Math.floor(seconds));
     await seekTo(seconds);
   };
 
@@ -229,7 +280,6 @@ export default function PlayerScreen() {
 
         {/* Transport controls */}
         <View style={styles.controls}>
-          {/* Shuffle */}
           <Pressable
             onPress={toggleShuffle}
             hitSlop={10}
@@ -247,12 +297,10 @@ export default function PlayerScreen() {
             )}
           </Pressable>
 
-          {/* Previous */}
           <Pressable hitSlop={10} style={styles.smallBtn} onPress={previous}>
             <Feather name="skip-back" size={30} color={colors.icon} />
           </Pressable>
 
-          {/* Play / pause */}
           <Pressable
             onPress={togglePlayPause}
             style={[
@@ -272,12 +320,10 @@ export default function PlayerScreen() {
             />
           </Pressable>
 
-          {/* Next */}
           <Pressable hitSlop={10} style={styles.smallBtn} onPress={next}>
             <Feather name="skip-forward" size={30} color={colors.icon} />
           </Pressable>
 
-          {/* Repeat */}
           <Pressable
             onPress={cycleRepeat}
             hitSlop={10}
