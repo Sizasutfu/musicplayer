@@ -1,10 +1,5 @@
 // app/_layout.tsx
 import { LogBox } from 'react-native';
-import TrackPlayer from 'react-native-track-player';
-
-// Register the lock-screen / notification event handler.
-// Must run before the app renders — this is module-load-time code.
-TrackPlayer.registerPlaybackService(() => require('../service'));
 
 // Silence the deprecation warning from a dependency still using the
 // old expo-file-system API. Remove once the dependency is updated.
