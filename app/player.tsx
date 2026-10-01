@@ -38,47 +38,42 @@ export default function PlayerScreen() {
     next,
     previous,
     seekTo,
+    shuffle,
+    repeatMode,
+    toggleShuffle,
+    cycleRepeat,
   } = usePlayer();
   const { colors, design } = useTheme();
 
   const [seeking, setSeeking] = useState(false);
   const [scrubPosition, setScrubPosition] = useState(0);
-
-  // ── Smooth position ─────────────────────────────────────
-  // Instead of a self-incrementing counter (which stalls or jumps
-  // whenever a tick lands late), we anchor a {position, timestamp}
-  // pair to the last known-real position and derive the displayed
-  // position from the wall clock each tick. A late or delayed tick
-  // just computes a slightly larger elapsed time — it never stalls,
-  // and it can't drift out of sync with a second independent timer.
   const [smoothPosition, setSmoothPosition] = useState(0);
-  const baseRef = useRef({ position: 0, timestamp: Date.now() });
+  const lastSyncRef = useRef<string | undefined>(undefined);
 
-  const duration = currentTrack?.duration ?? progress.duration ?? 0;
-
-  // Re-anchor whenever the real reported position updates (track change,
-  // seek, or the player's own periodic status tick) — but not while the
-  // user is actively scrubbing.
+  // Snap smooth position to real position on track change or big drift
   useEffect(() => {
     if (seeking) return;
-    baseRef.current = { position: progress.position, timestamp: Date.now() };
-    setSmoothPosition(progress.position);
-  }, [progress.position, seeking, currentTrack?.id]);
+    const real = progress.position;
+    if (
+      currentTrack?.id !== lastSyncRef.current ||
+      Math.abs(smoothPosition - real) > 1.5
+    ) {
+      setSmoothPosition(real);
+      lastSyncRef.current = currentTrack?.id;
+    }
+  }, [progress.position, seeking, smoothPosition, currentTrack?.id]);
 
-  // Recompute from the anchor every 250ms. Sub-second resolution means
-  // the whole-second display advances right when it crosses a boundary
-  // instead of waiting on a full 1s tick, which is what reads as "smooth".
+  // Local 1-second ticker so the counter never stutters
   useEffect(() => {
     if (!isPlaying || seeking) return;
     const id = setInterval(() => {
-      const elapsed = (Date.now() - baseRef.current.timestamp) / 1000;
-      const next = baseRef.current.position + elapsed;
-      setSmoothPosition(duration > 0 ? Math.min(next, duration) : next);
-    }, 250);
+      setSmoothPosition((prev) => prev + 1);
+    }, 1000);
     return () => clearInterval(id);
-  }, [isPlaying, seeking, duration]);
+  }, [isPlaying, seeking]);
 
   const displayPosition = seeking ? scrubPosition : smoothPosition;
+  const duration = currentTrack?.duration ?? progress.duration ?? 0;
 
   const artwork = (currentTrack as any)?.artwork as string | undefined;
 
@@ -89,7 +84,6 @@ export default function PlayerScreen() {
   const setSeekTo = async (seconds: number) => {
     setScrubPosition(seconds);
     setSmoothPosition(seconds);
-    baseRef.current = { position: seconds, timestamp: Date.now() };
     await seekTo(seconds);
   };
 
@@ -140,7 +134,7 @@ export default function PlayerScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Album art with waveform overlay */}
+        {/* Album art + waveform */}
         <View style={styles.artWrap}>
           <View
             style={[
@@ -235,14 +229,30 @@ export default function PlayerScreen() {
 
         {/* Transport controls */}
         <View style={styles.controls}>
-          <Pressable hitSlop={10} style={styles.smallBtn}>
-            <Feather name="shuffle" size={22} color={colors.iconMuted} />
+          {/* Shuffle */}
+          <Pressable
+            onPress={toggleShuffle}
+            hitSlop={10}
+            style={styles.smallBtn}
+          >
+            <Feather
+              name="shuffle"
+              size={22}
+              color={shuffle ? colors.primary : colors.iconMuted}
+            />
+            {shuffle && (
+              <View
+                style={[styles.activeDot, { backgroundColor: colors.primary }]}
+              />
+            )}
           </Pressable>
 
+          {/* Previous */}
           <Pressable hitSlop={10} style={styles.smallBtn} onPress={previous}>
             <Feather name="skip-back" size={30} color={colors.icon} />
           </Pressable>
 
+          {/* Play / pause */}
           <Pressable
             onPress={togglePlayPause}
             style={[
@@ -262,12 +272,32 @@ export default function PlayerScreen() {
             />
           </Pressable>
 
+          {/* Next */}
           <Pressable hitSlop={10} style={styles.smallBtn} onPress={next}>
             <Feather name="skip-forward" size={30} color={colors.icon} />
           </Pressable>
 
-          <Pressable hitSlop={10} style={styles.smallBtn}>
-            <Feather name="repeat" size={22} color={colors.iconMuted} />
+          {/* Repeat */}
+          <Pressable
+            onPress={cycleRepeat}
+            hitSlop={10}
+            style={styles.smallBtn}
+          >
+            <Feather
+              name="repeat"
+              size={22}
+              color={repeatMode !== 'off' ? colors.primary : colors.iconMuted}
+            />
+            {repeatMode === 'one' && (
+              <View
+                style={[
+                  styles.repeatBadge,
+                  { backgroundColor: colors.primary },
+                ]}
+              >
+                <Text style={styles.repeatBadgeText}>1</Text>
+              </View>
+            )}
           </Pressable>
         </View>
 
@@ -363,6 +393,29 @@ const styles = StyleSheet.create({
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  activeDot: {
+    position: 'absolute',
+    bottom: 6,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+  },
+  repeatBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  repeatBadgeText: {
+    color: '#ffffff',
+    fontSize: 9,
+    fontWeight: '800',
+    lineHeight: 11,
   },
   playBtn: {
     width: 72,
