@@ -44,6 +44,7 @@ export default function DrawerLayout() {
           drawerItemStyle: { display: 'none' },
         }}
       />
+      <Drawer.Screen name="circle" options={{ title: 'Circle' }} />
       <Drawer.Screen name="albums" options={{ title: 'Albums' }} />
       <Drawer.Screen name="artists" options={{ title: 'Artists' }} />
       <Drawer.Screen name="profile" options={{ title: 'Profile' }} />

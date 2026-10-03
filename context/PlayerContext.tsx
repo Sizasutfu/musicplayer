@@ -22,6 +22,8 @@ type PlayerContextValue = {
   queue: Song[];
   queueIndex: number;
   isPlaying: boolean;
+  /** True while the player is waiting for data (streams, seeks on streams). */
+  isBuffering: boolean;
   shuffle: boolean;
   repeatMode: RepeatMode;
   progress: { position: number; duration: number; buffered: number };
@@ -304,6 +306,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const isPlaying = status.playing ?? false;
+  const isBuffering = status.isBuffering ?? false;
 
   const value = useMemo<PlayerContextValue>(
     () => ({
@@ -312,6 +315,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       queue,
       queueIndex,
       isPlaying,
+      isBuffering,
       shuffle,
       repeatMode,
       progress: {
@@ -334,6 +338,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       queue,
       queueIndex,
       isPlaying,
+      isBuffering,
       shuffle,
       repeatMode,
       status.currentTime,

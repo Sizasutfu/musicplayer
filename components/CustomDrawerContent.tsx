@@ -24,6 +24,7 @@ const PRIMARY: Item[] = [
 ];
 
 const BROWSE: Item[] = [
+  { key: 'circle', label: 'Circle', icon: 'radio', route: '/(drawer)/circle' },
   { key: 'albums', label: 'Albums', icon: 'disc', route: '/(drawer)/albums' },
   { key: 'artists', label: 'Artists', icon: 'user', route: '/(drawer)/artists' },
   { key: 'profile', label: 'Profile', icon: 'user-check', route: '/(drawer)/profile' },

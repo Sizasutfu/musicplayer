@@ -14,6 +14,7 @@ import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { usePlayer } from '../context/PlayerContext';
 import { useTheme } from '../context/ThemeContext';
+import { likeKey } from '../lib/circle';
 import SeekBar from '../components/SeekBar';
 import LikeButton from '../components/LikeButton';
 import WaveformVisualizer from '../components/WaveformVisualizer';
@@ -34,11 +35,16 @@ function formatTime(seconds: number) {
 // from the audio player during playback, which avoids the jitter
 // in expo-audio's position reporting.
 //
+// The clock only runs while audio is actually advancing, i.e.
+// playing AND not buffering. That keeps it honest for streamed
+// tracks (startup delay, stalls, seeks that need a re-fetch)
+// without reading the player's position.
+//
 // stateRef holds:
 //   trackId        - used to detect track changes
 //   baseSeconds    - seconds accumulated before the current segment
 //   segmentStart   - wall-clock time the current segment started
-//   wasPlaying     - previous isPlaying value, to detect flips
+//   wasPlaying     - previous "effectively playing" value, to detect flips
 type PositionState = {
   trackId: string | undefined;
   baseSeconds: number;
@@ -50,6 +56,7 @@ export default function PlayerScreen() {
   const {
     currentTrack,
     isPlaying,
+    isBuffering,
     progress,
     togglePlayPause,
     next,
@@ -66,6 +73,11 @@ export default function PlayerScreen() {
   const [scrubPosition, setScrubPosition] = useState(0);
   const [displaySecond, setDisplaySecond] = useState(0);
 
+  // Audio is only really advancing when it is playing and not waiting
+  // for data. Local files are never buffering, so for them this is
+  // identical to isPlaying.
+  const effectivePlaying = isPlaying && !isBuffering;
+
   const stateRef = useRef<PositionState>({
     trackId: undefined,
     baseSeconds: 0,
@@ -74,10 +86,10 @@ export default function PlayerScreen() {
   });
 
   // ── Anchor management ──────────────────────────────────
-  // Runs on track change and play/pause flip. Handles:
+  // Runs on track change and play/pause/buffering flip. Handles:
   //   - New track → reset base to 0
   //   - Resume    → start a new segment at current wall time
-  //   - Pause     → accumulate elapsed time into base
+  //   - Pause or buffering → accumulate elapsed time into base
   useEffect(() => {
     const s = stateRef.current;
     const now = Date.now();
@@ -87,29 +99,29 @@ export default function PlayerScreen() {
       s.trackId = currentTrack?.id;
       s.baseSeconds = 0;
       s.segmentStart = now;
-      s.wasPlaying = isPlaying;
+      s.wasPlaying = effectivePlaying;
       setDisplaySecond(0);
       return;
     }
 
-    // Play/pause flip
-    if (isPlaying !== s.wasPlaying) {
-      if (isPlaying) {
+    // Play/pause/buffering flip
+    if (effectivePlaying !== s.wasPlaying) {
+      if (effectivePlaying) {
         // Just resumed → new segment begins now
         s.segmentStart = now;
       } else {
-        // Just paused → accumulate elapsed time
+        // Just paused or started buffering → accumulate elapsed time
         s.baseSeconds += (now - s.segmentStart) / 1000;
       }
-      s.wasPlaying = isPlaying;
+      s.wasPlaying = effectivePlaying;
     }
-  }, [currentTrack?.id, isPlaying]);
+  }, [currentTrack?.id, effectivePlaying]);
 
   // ── Wall-clock ticker ──────────────────────────────────
-  // Runs only while playing and not scrubbing. Derives the display
-  // second from wall-clock elapsed time, never from the player.
+  // Runs only while audio is advancing and not scrubbing. Derives the
+  // display second from wall-clock elapsed time, never from the player.
   useEffect(() => {
-    if (!isPlaying || seeking) return;
+    if (!effectivePlaying || seeking) return;
 
     const id = setInterval(() => {
       const s = stateRef.current;
@@ -118,7 +130,7 @@ export default function PlayerScreen() {
     }, 250);
 
     return () => clearInterval(id);
-  }, [isPlaying, seeking]);
+  }, [effectivePlaying, seeking]);
 
   const displayPosition = seeking ? scrubPosition : displaySecond;
   const duration = currentTrack?.duration ?? progress.duration ?? 0;
@@ -208,7 +220,7 @@ export default function PlayerScreen() {
 
             <View style={styles.waveWrap} pointerEvents="none">
               <WaveformVisualizer
-                playing={isPlaying}
+                playing={effectivePlaying}
                 color={colors.primary}
                 height={72}
                 opacity={0.9}
@@ -238,7 +250,7 @@ export default function PlayerScreen() {
           </View>
 
           {currentTrack ? (
-            <LikeButton uri={currentTrack.url} size={26} hitSlop={10} />
+            <LikeButton uri={likeKey(currentTrack)} size={26} hitSlop={10} />
           ) : (
             <View style={styles.likePlaceholder} />
           )}

@@ -18,10 +18,11 @@ import {
   Image,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, router } from 'expo-router';
 import { DrawerActions } from '@react-navigation/native';
 import { useLibrary, type Song } from '../../../hooks/useLibrary';
+import { useCircleTracks } from '../../../hooks/useCircleTracks';
+import { isCircleSong, likeKey } from '../../../lib/circle';
 import { usePlayer } from '../../../context/PlayerContext';
 import { useTheme } from '../../../context/ThemeContext';
 import { useProfile } from '../../../hooks/useProfile';
@@ -31,6 +32,7 @@ import SongActionSheet from '../../../components/SongActionSheet';
 import LikeButton from '../../../components/LikeButton';
 
 type SortMode = 'title' | 'artist' | 'album';
+type Source = 'device' | 'circle';
 
 function MenuButton() {
   const navigation = useNavigation<any>();
@@ -69,11 +71,104 @@ function ProfileButton() {
   );
 }
 
+// Full-area message used for loading / permission / error states.
+function CenterState({
+  icon,
+  busy,
+  title,
+  subtitle,
+  actionLabel,
+  onAction,
+  colors,
+  design,
+}: {
+  icon?: React.ComponentProps<typeof Feather>['name'];
+  busy?: boolean;
+  title: string;
+  subtitle?: string;
+  actionLabel?: string;
+  onAction?: () => void;
+  colors: any;
+  design: any;
+}) {
+  return (
+    <View style={styles.center}>
+      {busy ? (
+        <>
+          <ActivityIndicator color={colors.primary} />
+          <Text
+            style={[
+              design.type.caption,
+              { color: colors.textSecondary, marginTop: 8 },
+            ]}
+          >
+            {title}
+          </Text>
+        </>
+      ) : (
+        <>
+          {icon ? (
+            <Feather name={icon} size={42} color={colors.iconMuted} />
+          ) : null}
+          <Text
+            style={[
+              design.type.heading,
+              { color: colors.text, marginTop: icon ? 8 : 0 },
+            ]}
+          >
+            {title}
+          </Text>
+          {subtitle ? (
+            <Text
+              style={[
+                design.type.caption,
+                {
+                  color: colors.textSecondary,
+                  marginTop: 4,
+                  textAlign: 'center',
+                },
+              ]}
+            >
+              {subtitle}
+            </Text>
+          ) : null}
+          {actionLabel && onAction ? (
+            <Pressable
+              style={[
+                styles.primaryBtn,
+                {
+                  backgroundColor: colors.primary,
+                  borderRadius: design.radius.pill,
+                },
+              ]}
+              onPress={onAction}
+            >
+              <Text
+                style={[
+                  design.type.caption,
+                  { color: colors.primaryText, fontWeight: '700' },
+                ]}
+              >
+                {actionLabel}
+              </Text>
+            </Pressable>
+          ) : null}
+        </>
+      )}
+    </View>
+  );
+}
+
 export default function LibraryScreen() {
   const { songs, loading, enriching, granted, error, refresh } = useLibrary();
   const { playQueue, currentTrack } = usePlayer();
   const { colors, design } = useTheme();
   const navigation = useNavigation();
+
+  const [source, setSource] = useState<Source>('device');
+  const isCircle = source === 'circle';
+  // Only fetches once the Circle source is first opened
+  const circle = useCircleTracks(isCircle);
 
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -151,9 +246,11 @@ export default function LibraryScreen() {
     }
   }, [navigation, searchOpen, query, openSearch, closeSearch, colors]);
 
+  const baseSongs = isCircle ? circle.songs : songs;
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let list = songs;
+    let list = baseSongs;
     if (q) {
       list = list.filter(
         (s) =>
@@ -177,122 +274,82 @@ export default function LibraryScreen() {
       return (a.title || '').localeCompare(b.title || '');
     });
     return sorted;
-  }, [songs, query, sort]);
+  }, [baseSongs, query, sort]);
 
-  if (loading) {
-    return (
-      <SafeAreaView
-        style={[styles.center, { backgroundColor: colors.background }]}
-        edges={['left', 'right']}
-      >
-        <ActivityIndicator color={colors.primary} />
-        <Text
-          style={[
-            design.type.caption,
-            { color: colors.textSecondary, marginTop: 8 },
-          ]}
-        >
-          Loading your library…
-        </Text>
-      </SafeAreaView>
-    );
-  }
+  // ── Loading / permission / error states ──────────────────
+  // These replace the list but NOT the source switch, so you can
+  // always flip between Device and Circle.
+  let stateView: React.ReactNode = null;
 
-  if (!granted) {
-    return (
-      <SafeAreaView
-        style={[styles.center, { backgroundColor: colors.background }]}
-        edges={['left', 'right']}
-      >
-        <Feather name="music" size={42} color={colors.iconMuted} />
-        <Text
-          style={[
-            design.type.heading,
-            { color: colors.text, marginTop: 8 },
-          ]}
-        >
-          No access to your music
-        </Text>
-        <Text
-          style={[
-            design.type.caption,
-            { color: colors.textSecondary, marginTop: 4 },
-          ]}
-        >
-          Grant permission to see songs on this device.
-        </Text>
-        <Pressable
-          style={[
-            styles.primaryBtn,
-            {
-              backgroundColor: colors.primary,
-              borderRadius: design.radius.pill,
-            },
-          ]}
-          onPress={refresh}
-        >
-          <Text
-            style={[
-              design.type.caption,
-              { color: colors.primaryText, fontWeight: '700' },
-            ]}
-          >
-            Grant permission
-          </Text>
-        </Pressable>
-      </SafeAreaView>
-    );
-  }
-
-  if (error) {
-    return (
-      <SafeAreaView
-        style={[styles.center, { backgroundColor: colors.background }]}
-        edges={['left', 'right']}
-      >
-        <Text style={[design.type.heading, { color: colors.text }]}>
-          Something went wrong
-        </Text>
-        <Text
-          style={[
-            design.type.caption,
-            { color: colors.textSecondary, marginTop: 4 },
-          ]}
-        >
-          {error}
-        </Text>
-        <Pressable
-          style={[
-            styles.primaryBtn,
-            {
-              backgroundColor: colors.primary,
-              borderRadius: design.radius.pill,
-            },
-          ]}
-          onPress={refresh}
-        >
-          <Text
-            style={[
-              design.type.caption,
-              { color: colors.primaryText, fontWeight: '700' },
-            ]}
-          >
-            Try again
-          </Text>
-        </Pressable>
-      </SafeAreaView>
-    );
+  if (!isCircle) {
+    if (loading) {
+      stateView = (
+        <CenterState
+          busy
+          title="Loading your library…"
+          colors={colors}
+          design={design}
+        />
+      );
+    } else if (!granted) {
+      stateView = (
+        <CenterState
+          icon="music"
+          title="No access to your music"
+          subtitle="Grant permission to see songs on this device."
+          actionLabel="Grant permission"
+          onAction={refresh}
+          colors={colors}
+          design={design}
+        />
+      );
+    } else if (error) {
+      stateView = (
+        <CenterState
+          title="Something went wrong"
+          subtitle={error}
+          actionLabel="Try again"
+          onAction={refresh}
+          colors={colors}
+          design={design}
+        />
+      );
+    }
+  } else {
+    if (circle.loading && circle.songs.length === 0) {
+      stateView = (
+        <CenterState
+          busy
+          title="Loading from Circle…"
+          colors={colors}
+          design={design}
+        />
+      );
+    } else if (circle.error && circle.songs.length === 0) {
+      stateView = (
+        <CenterState
+          icon="wifi-off"
+          title="Couldn't load Circle tracks"
+          subtitle={circle.error}
+          actionLabel="Try again"
+          onAction={circle.refresh}
+          colors={colors}
+          design={design}
+        />
+      );
+    }
   }
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <View style={styles.sortRow}>
-        {(['title', 'artist', 'album'] as SortMode[]).map((mode) => {
-          const active = sort === mode;
+      {/* Source switch */}
+      <View style={styles.sourceRow}>
+        {(['device', 'circle'] as Source[]).map((s) => {
+          const active = source === s;
           return (
             <Pressable
-              key={mode}
-              onPress={() => setSort(mode)}
+              key={s}
+              onPress={() => setSource(s)}
               style={[
                 styles.sortBtn,
                 {
@@ -312,77 +369,131 @@ export default function LibraryScreen() {
                   },
                 ]}
               >
-                {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                {s === 'device' ? 'Device' : 'Circle'}
               </Text>
             </Pressable>
           );
         })}
-        {enriching && (
-          <View
-            style={[
-              styles.enrichingChip,
-              {
-                backgroundColor: colors.rowActive,
-                borderRadius: design.radius.pill,
-              },
-            ]}
-          >
-            <ActivityIndicator size="small" color={colors.primary} />
-            <Text
-              style={[
-                design.type.caption,
-                { color: colors.primary, fontWeight: '700' },
-              ]}
-            >
-              Reading tags
-            </Text>
-          </View>
-        )}
       </View>
 
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingBottom: 200 }}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        initialNumToRender={20}
-        windowSize={10}
-        removeClippedSubviews
-        renderItem={({ item, index }) => (
-          <SongRow
-            song={item}
-            isActive={currentTrack?.id === item.id}
-            onPress={() => playQueue(filtered, index)}
-            onLongPress={() => setActionSong(item)}
-            colors={colors}
-            design={design}
-          />
-        )}
-        ListEmptyComponent={
-          <View style={styles.center}>
-            <Feather name="music" size={42} color={colors.iconMuted} />
-            <Text
-              style={[
-                design.type.heading,
-                { color: colors.text, marginTop: 8 },
-              ]}
-            >
-              {query ? 'No matches' : 'No songs found'}
-            </Text>
-            <Text
-              style={[
-                design.type.caption,
-                { color: colors.textSecondary, marginTop: 4 },
-              ]}
-            >
-              {query
-                ? 'Try a different search.'
-                : 'Add audio files to this device to see them here.'}
-            </Text>
+      {stateView ?? (
+        <>
+          <View style={styles.sortRow}>
+            {(['title', 'artist', 'album'] as SortMode[]).map((mode) => {
+              const active = sort === mode;
+              return (
+                <Pressable
+                  key={mode}
+                  onPress={() => setSort(mode)}
+                  style={[
+                    styles.sortBtn,
+                    {
+                      backgroundColor: colors.chipBg,
+                      borderRadius: design.radius.pill,
+                    },
+                    active && { backgroundColor: colors.chipBgActive },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      design.type.caption,
+                      { color: colors.chipText, fontWeight: '600' },
+                      active && {
+                        color: colors.chipTextActive,
+                        fontWeight: '700',
+                      },
+                    ]}
+                  >
+                    {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+            {!isCircle && enriching && (
+              <View
+                style={[
+                  styles.enrichingChip,
+                  {
+                    backgroundColor: colors.rowActive,
+                    borderRadius: design.radius.pill,
+                  },
+                ]}
+              >
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text
+                  style={[
+                    design.type.caption,
+                    { color: colors.primary, fontWeight: '700' },
+                  ]}
+                >
+                  Reading tags
+                </Text>
+              </View>
+            )}
           </View>
-        }
-      />
+
+          <FlatList
+            data={filtered}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={{ paddingBottom: 200 }}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            initialNumToRender={20}
+            windowSize={10}
+            removeClippedSubviews
+            // Pull down to re-fetch the Circle list (device list has no pull-to-refresh)
+            refreshing={isCircle && circle.loading}
+            onRefresh={isCircle ? circle.refresh : undefined}
+            renderItem={({ item, index }) => (
+              <SongRow
+                song={item}
+                isActive={currentTrack?.id === item.id}
+                onPress={() => playQueue(filtered, index)}
+                // The action sheet works on files on this device, so it is
+                // not offered for Circle tracks.
+                onLongPress={
+                  isCircleSong(item) ? undefined : () => setActionSong(item)
+                }
+                colors={colors}
+                design={design}
+              />
+            )}
+            ListEmptyComponent={
+              <View style={styles.center}>
+                <Feather name="music" size={42} color={colors.iconMuted} />
+                <Text
+                  style={[
+                    design.type.heading,
+                    { color: colors.text, marginTop: 8 },
+                  ]}
+                >
+                  {query
+                    ? 'No matches'
+                    : isCircle
+                    ? 'No Circle tracks yet'
+                    : 'No songs found'}
+                </Text>
+                <Text
+                  style={[
+                    design.type.caption,
+                    {
+                      color: colors.textSecondary,
+                      marginTop: 4,
+                      textAlign: 'center',
+                    },
+                  ]}
+                >
+                  {query
+                    ? 'Try a different search.'
+                    : isCircle
+                    ? 'Upload a track to your Circle server, then pull down to refresh.'
+                    : 'Add audio files to this device to see them here.'}
+                </Text>
+              </View>
+            }
+          />
+        </>
+      )}
 
       <MiniPlayer bottomOffset={0} />
 
@@ -406,7 +517,7 @@ const SongRow = React.memo(function SongRow({
   song: Song;
   isActive: boolean;
   onPress: () => void;
-  onLongPress: () => void;
+  onLongPress?: () => void;
   colors: any;
   design: any;
 }) {
@@ -485,7 +596,7 @@ const SongRow = React.memo(function SongRow({
         <Feather name="volume-2" size={16} color={colors.primary} />
       )}
 
-      <LikeButton uri={song.url} size={18} />
+      <LikeButton uri={likeKey(song)} size={18} />
     </Pressable>
   );
 });
@@ -515,6 +626,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     paddingVertical: Platform.OS === 'ios' ? 8 : 4,
     minWidth: 200,
+  },
+  sourceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 12,
   },
   sortRow: {
     flexDirection: 'row',
