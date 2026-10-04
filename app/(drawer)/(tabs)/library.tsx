@@ -20,13 +20,12 @@ import { Feather } from '@expo/vector-icons';
 import { useNavigation } from 'expo-router';
 import { useLibrary, type Song } from '../../../hooks/useLibrary';
 import { useCircleTracks } from '../../../hooks/useCircleTracks';
-import { isCircleSong, likeKey } from '../../../lib/circle';
+import { isCircleSong } from '../../../lib/circle';
 import { usePlayer } from '../../../context/PlayerContext';
 import { useTheme } from '../../../context/ThemeContext';
 import BackButton from '../../../components/BackButton';
 import MiniPlayer from '../../../components/MiniPlayer';
 import SongActionSheet from '../../../components/SongActionSheet';
-import LikeButton from '../../../components/LikeButton';
 
 type SortMode = 'title' | 'artist' | 'album';
 type Source = 'device' | 'circle';
@@ -350,6 +349,9 @@ export default function LibraryScreen() {
               onLongPress={
                 isCircleSong(item) ? undefined : () => setActionSong(item)
               }
+              onMenu={
+                isCircleSong(item) ? undefined : () => setActionSong(item)
+              }
               colors={colors}
               design={design}
             />
@@ -512,6 +514,7 @@ const SongRow = React.memo(function SongRow({
   isActive,
   onPress,
   onLongPress,
+  onMenu,
   colors,
   design,
 }: {
@@ -519,6 +522,7 @@ const SongRow = React.memo(function SongRow({
   isActive: boolean;
   onPress: () => void;
   onLongPress?: () => void;
+  onMenu?: () => void;
   colors: any;
   design: any;
 }) {
@@ -591,15 +595,22 @@ const SongRow = React.memo(function SongRow({
       </View>
 
       {isActive ? (
-        <Feather
-          name="volume-2"
-          size={16}
-          color={colors.primary}
-          style={{ marginRight: 4 }}
-        />
+        <Feather name="volume-2" size={16} color={colors.primary} />
       ) : null}
 
-      <LikeButton uri={likeKey(song)} size={20} />
+      {onMenu ? (
+        <Pressable
+          onPress={onMenu}
+          hitSlop={10}
+          style={styles.menuBtn}
+        >
+          <Feather
+            name="more-vertical"
+            size={18}
+            color={colors.iconMuted}
+          />
+        </Pressable>
+      ) : null}
     </Pressable>
   );
 });
@@ -708,6 +719,12 @@ const styles = StyleSheet.create({
   rowTitle: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  menuBtn: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   center: {

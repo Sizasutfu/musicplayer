@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
+import { useFavorites } from '../hooks/useFavorites';
 import type { Song } from '../hooks/useLibrary';
 import AddToPlaylistSheet from './AddToPlaylistSheet';
 
@@ -35,11 +36,20 @@ export default function SongActionSheet({
   extraActions,
 }: Props) {
   const { colors, design } = useTheme();
+  const { favorites, toggle } = useFavorites();
   const [playlistOpen, setPlaylistOpen] = useState(false);
 
   const close = () => {
     setPlaylistOpen(false);
     onClose();
+  };
+
+  const isFavorite = !!song && favorites.includes(song.url);
+
+  const handleToggleFavorite = () => {
+    if (!song) return;
+    toggle(song.url);
+    close();
   };
 
   const handlePlayNext = () => {
@@ -110,6 +120,16 @@ export default function SongActionSheet({
               </View>
             )}
 
+            {song && (
+              <ActionRow
+                icon="heart"
+                label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                iconFilled={isFavorite}
+                onPress={handleToggleFavorite}
+                colors={colors}
+                design={design}
+              />
+            )}
             <ActionRow
               icon="plus-circle"
               label="Add to playlist"
@@ -182,6 +202,7 @@ function ActionRow({
   colors,
   design,
   destructive,
+  iconFilled,
   last,
 }: {
   icon: React.ComponentProps<typeof Feather>['name'];
@@ -190,8 +211,17 @@ function ActionRow({
   colors: any;
   design: any;
   destructive?: boolean;
+  iconFilled?: boolean;
   last?: boolean;
 }) {
+  // Feather doesn't have a filled heart, so a favorited track uses
+  // the app's primary colour to signal the active state instead.
+  const iconColor = destructive
+    ? colors.danger
+    : iconFilled
+    ? colors.primary
+    : colors.primary;
+
   return (
     <Pressable
       onPress={onPress}
@@ -218,7 +248,7 @@ function ActionRow({
         <Feather
           name={icon}
           size={18}
-          color={destructive ? colors.danger : colors.primary}
+          color={iconColor}
         />
       </View>
       <Text
@@ -233,7 +263,9 @@ function ActionRow({
       >
         {label}
       </Text>
-      <Feather name="chevron-right" size={18} color={colors.textMuted} />
+      {iconFilled && (
+        <Feather name="check" size={18} color={colors.primary} />
+      )}
     </Pressable>
   );
 }
