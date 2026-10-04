@@ -20,8 +20,13 @@ import { useProfile } from '../../hooks/useProfile';
 import { usePlaylists } from '../../hooks/usePlaylists';
 import { useLibrary } from '../../hooks/useLibrary';
 import { useTheme } from '../../context/ThemeContext';
-import { AVATAR_COLORS } from '../../lib/profile';
+import {
+  AVATAR_COLORS,
+  deleteAvatarFile,
+  persistAvatar,
+} from '../../lib/profile';
 import ProfileAvatar from '../../components/ProfileAvatar';
+import PhotoPickerModal from '../../components/PhotoPickerModal';
 import MiniPlayer from '../../components/MiniPlayer';
 
 type Colors = ReturnType<typeof useTheme>['colors'];
@@ -38,6 +43,7 @@ export default function ProfileScreen() {
 
   const [editField, setEditField] = useState<EditField>(null);
   const [draft, setDraft] = useState('');
+  const [pickerVisible, setPickerVisible] = useState(false);
 
   const openEdit = (field: Exclude<EditField, null>) => {
     setEditField(field);
@@ -55,13 +61,54 @@ export default function ProfileScreen() {
     setEditField(null);
   };
 
+  // ── Avatar handling ────────────────────────────────────
+  const handlePickAvatar = async (sourceUri: string) => {
+    try {
+      const persisted = await persistAvatar(sourceUri);
+      // Only delete the old file after the new one is safely copied,
+      // so a failed copy can never leave us with no avatar at all.
+      await deleteAvatarFile(profile.avatarUri);
+      update('avatarUri', persisted);
+    } catch (e) {
+      console.warn('[Profile] avatar save failed:', e);
+      Alert.alert('Could not set photo', 'Please try again.');
+    }
+  };
+
+  const removeAvatar = async () => {
+    await deleteAvatarFile(profile.avatarUri);
+    update('avatarUri', undefined);
+  };
+
+  const openAvatarMenu = () => {
+    const buttons: Parameters<typeof Alert.alert>[2] = [
+      { text: 'Choose from library', onPress: () => setPickerVisible(true) },
+    ];
+    if (profile.avatarUri) {
+      buttons.push({
+        text: 'Remove photo',
+        style: 'destructive',
+        onPress: removeAvatar,
+      });
+    }
+    buttons.push({ text: 'Cancel', style: 'cancel' });
+    Alert.alert('Profile photo', undefined, buttons);
+  };
+
   const confirmReset = () => {
     Alert.alert(
       'Reset profile?',
       'Your name, avatar, and bio will be reset to defaults.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Reset', style: 'destructive', onPress: () => reset() },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteAvatarFile(profile.avatarUri);
+            reset();
+          },
+        },
       ]
     );
   };
@@ -93,12 +140,28 @@ export default function ProfileScreen() {
             { backgroundColor: colors.surface },
           ]}
         >
-          <ProfileAvatar
-            name={profile.name}
-            color={profile.avatarColor}
-            size={96}
-            fontSize={38}
-          />
+          <Pressable onPress={openAvatarMenu} hitSlop={8}>
+            <View>
+              <ProfileAvatar
+                name={profile.name}
+                color={profile.avatarColor}
+                uri={profile.avatarUri}
+                size={96}
+                fontSize={38}
+              />
+              <View
+                style={[
+                  styles.cameraBadge,
+                  {
+                    backgroundColor: colors.primary,
+                    borderColor: colors.surface,
+                  },
+                ]}
+              >
+                <Feather name="camera" size={14} color={colors.primaryText} />
+              </View>
+            </View>
+          </Pressable>
 
           <Text
             style={[
@@ -366,6 +429,12 @@ export default function ProfileScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
+      <PhotoPickerModal
+        visible={pickerVisible}
+        onClose={() => setPickerVisible(false)}
+        onPick={handlePickAvatar}
+      />
+
       <MiniPlayer />
     </SafeAreaView>
   );
@@ -577,6 +646,17 @@ const styles = StyleSheet.create({
     marginTop: 18,
     paddingHorizontal: 18,
     paddingVertical: 9,
+  },
+  cameraBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
   },
 
   section: {},

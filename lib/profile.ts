@@ -6,6 +6,7 @@ export type Profile = {
   username: string;
   bio: string;
   avatarColor: string;
+  avatarUri?: string;
   joinedAt: number;
 };
 
@@ -28,10 +29,12 @@ export const DEFAULT_PROFILE: Profile = {
   username: 'username',
   bio: 'i love music',
   avatarColor: AVATAR_COLORS[0],
+  avatarUri: undefined,
   joinedAt: Date.now(),
 };
 
 const PROFILE_PATH = FileSystem.documentDirectory + 'profile.json';
+const AVATAR_DIR = FileSystem.documentDirectory + 'avatars/';
 
 export async function loadProfile(): Promise<Profile> {
   try {
@@ -76,4 +79,37 @@ export function getInitials(name: string): string {
     return parts[0].slice(0, 2).toUpperCase();
   }
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+// ── Avatar file helpers ────────────────────────────────────
+
+// Copy the picked photo into the app's document directory so it
+// survives the OS purging the picker's cache directory. Returns
+// the persistent URI to store in the profile.
+export async function persistAvatar(sourceUri: string): Promise<string> {
+  const info = await FileSystem.getInfoAsync(AVATAR_DIR);
+  if (!info.exists) {
+    await FileSystem.makeDirectoryAsync(AVATAR_DIR, { intermediates: true });
+  }
+
+  const ext =
+    sourceUri.split('?')[0].split('.').pop()?.toLowerCase() || 'jpg';
+  const dest = `${AVATAR_DIR}avatar-${Date.now()}.${ext}`;
+
+  await FileSystem.copyAsync({ from: sourceUri, to: dest });
+  return dest;
+}
+
+// Best-effort cleanup of a previously persisted avatar file.
+// Ignores anything that isn't inside our own avatars directory,
+// so a stale profile pointing at some external URI can't cause
+// us to delete a file we don't own.
+export async function deleteAvatarFile(uri?: string): Promise<void> {
+  if (!uri) return;
+  if (!uri.startsWith(AVATAR_DIR)) return;
+  try {
+    await FileSystem.deleteAsync(uri, { idempotent: true });
+  } catch {
+    // ignore
+  }
 }
