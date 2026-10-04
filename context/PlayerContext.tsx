@@ -5,8 +5,10 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
+import { AppState } from 'react-native';
 import {
   setAudioModeAsync,
   useAudioPlayer,
@@ -41,11 +43,11 @@ type PlayerContextValue = {
 const PlayerContext = createContext<PlayerContextValue | null>(null);
 
 // ── Persisted preferences ──────────────────────────────────
-// Only shuffle + repeatMode are persisted. shuffleOrder is
-// deliberately NOT persisted: it's an index array into the queue,
-// and the queue doesn't survive a restart — it's rebuilt from
-// whatever the user picks next. startQueue regenerates the order
-// from the shuffle flag, so restoring the flag is sufficient.
+// shuffle + repeatMode. shuffleOrder is deliberately NOT persisted:
+// it's an index array into the queue, and the queue itself doesn't
+// survive a restart — it's rebuilt from whatever the user plays
+// next. startQueue regenerates the order from the shuffle flag, so
+// restoring the flag is sufficient.
 type PlayerPrefs = {
   shuffle: boolean;
   repeatMode: RepeatMode;
@@ -87,6 +89,48 @@ async function savePlayerPrefs(prefs: PlayerPrefs) {
     await AsyncStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
   } catch (e) {
     console.warn('[Player] failed to save prefs:', e);
+  }
+}
+
+// ── Persisted last-played state ────────────────────────────
+// Saves the track, the queue it belonged to, and the index within
+// that queue. Restored on mount so the player screen shows what
+// was last playing. Playback is NOT resumed automatically — the
+// source is loaded (paused) so the play button works immediately,
+// but no sound starts until the user presses play.
+type LastPlayed = {
+  track: Song;
+  queue: Song[];
+  index: number;
+};
+
+const LAST_PLAYED_KEY = 'player:lastPlayed:v1';
+
+async function loadLastPlayed(): Promise<LastPlayed | null> {
+  try {
+    const raw = await AsyncStorage.getItem(LAST_PLAYED_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    if (!parsed?.track?.url) return null;
+    if (!Array.isArray(parsed?.queue) || parsed.queue.length === 0) return null;
+
+    return {
+      track: parsed.track,
+      queue: parsed.queue,
+      index: typeof parsed.index === 'number' ? parsed.index : 0,
+    };
+  } catch (e) {
+    console.warn('[Player] failed to load lastPlayed:', e);
+    return null;
+  }
+}
+
+async function saveLastPlayed(data: LastPlayed) {
+  try {
+    await AsyncStorage.setItem(LAST_PLAYED_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.warn('[Player] failed to save lastPlayed:', e);
   }
 }
 
@@ -136,10 +180,31 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   );
   const [shuffleOrder, setShuffleOrder] = useState<number[]>([]);
 
-  // Gate writes until we've read what was stored. Without this the
-  // persist effect below would run on the first render with defaults
-  // and overwrite the saved values before the load resolves.
-  const [prefsHydrated, setPrefsHydrated] = useState(false);
+  // Gate persistence writes until we've read what was stored.
+  // Without this, the persist effects below would run on the first
+  // render with defaults and clobber the saved values before the
+  // async reads resolve.
+  const [hydrated, setHydrated] = useState(false);
+
+  // Refs mirror current state so async/event callbacks can read the
+  // latest values without being re-created on every change.
+  const currentTrackRef = useRef(currentTrack);
+  const queueRef = useRef(queue);
+  const queueIndexRef = useRef(queueIndex);
+  const hydratedRef = useRef(hydrated);
+
+  useEffect(() => {
+    currentTrackRef.current = currentTrack;
+  }, [currentTrack]);
+  useEffect(() => {
+    queueRef.current = queue;
+  }, [queue]);
+  useEffect(() => {
+    queueIndexRef.current = queueIndex;
+  }, [queueIndex]);
+  useEffect(() => {
+    hydratedRef.current = hydrated;
+  }, [hydrated]);
 
   // ── Audio session config ────────────────────────────────
   useEffect(() => {
@@ -155,29 +220,96 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       });
   }, []);
 
-  // ── Hydrate persisted prefs once on mount ───────────────
+  // ── Hydrate prefs + last-played once on mount ───────────
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
       const prefs = await loadPlayerPrefs();
+      const last = await loadLastPlayed();
       if (cancelled) return;
 
       setShuffle(prefs.shuffle);
       setRepeatMode(prefs.repeatMode);
-      setPrefsHydrated(true);
+
+      if (last) {
+        const safeIndex = Math.max(
+          0,
+          Math.min(last.index, last.queue.length - 1)
+        );
+
+        setQueue(last.queue);
+        setQueueIndex(safeIndex);
+        setCurrentTrack(last.track);
+
+        if (prefs.shuffle) {
+          setShuffleOrder(buildShuffleOrder(last.queue.length, safeIndex));
+        }
+
+        // Load the source WITHOUT playing, so the play button works
+        // immediately and the lock screen shows the last track.
+        try {
+          player.replace({ uri: last.track.url });
+
+          try {
+            const artworkIsUsable = isUsableArtworkUrl(last.track.artwork);
+            player.setActiveForLockScreen(true, {
+              title: last.track.title,
+              artist: last.track.artist,
+              albumTitle: last.track.album ?? '',
+              ...(artworkIsUsable ? { artworkUrl: last.track.artwork } : {}),
+            });
+          } catch (e) {
+            console.warn('[Player] restore setActiveForLockScreen failed:', e);
+          }
+        } catch (e) {
+          console.warn('[Player] restore replace failed:', e);
+        }
+      }
+
+      setHydrated(true);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [player]);
 
   // ── Persist prefs whenever either value changes ─────────
   useEffect(() => {
-    if (!prefsHydrated) return;
+    if (!hydrated) return;
     savePlayerPrefs({ shuffle, repeatMode });
-  }, [shuffle, repeatMode, prefsHydrated]);
+  }, [shuffle, repeatMode, hydrated]);
+
+  // ── Persist last-played ─────────────────────────────────
+  const persistLastPlayed = useCallback(() => {
+    if (!hydratedRef.current) return;
+
+    const track = currentTrackRef.current;
+    if (!track) return;
+
+    saveLastPlayed({
+      track,
+      queue: queueRef.current,
+      index: queueIndexRef.current,
+    });
+  }, []);
+
+  // On track / queue / index change
+  useEffect(() => {
+    if (hydrated) persistLastPlayed();
+  }, [currentTrack?.id, queue, queueIndex, hydrated, persistLastPlayed]);
+
+  // On app background — catches the case where the app is killed
+  // while playing, so the most recent track is what we restore.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'background' || state === 'inactive') {
+        persistLastPlayed();
+      }
+    });
+    return () => sub.remove();
+  }, [persistLastPlayed]);
 
   // ── Low-level: swap the track on the player ─────────────
   const loadIntoPlayer = useCallback(
