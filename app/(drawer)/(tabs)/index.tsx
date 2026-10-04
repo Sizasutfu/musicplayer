@@ -33,7 +33,7 @@ export default function HomeScreen() {
   const { playlists } = usePlaylists();
   const { songs } = useLibrary();
   const { colors, design } = useTheme();
-  const { playQueue } = usePlayer();
+  const { playQueue, recentIds } = usePlayer();
   const navigation = useNavigation();
 
   const [category, setCategory] = useState<Category>('all');
@@ -67,9 +67,22 @@ export default function HomeScreen() {
     if (songs.length) playQueue(songs, 0);
   };
 
-  // Build a URI → Song lookup once so each playlist row doesn't
-  // re-scan the library. Playlists store trackUris (strings), but
-  // the player works with Song objects — this bridges the two.
+  // Resolve recent IDs against the current library. IDs that no
+  // longer exist (file deleted, folder renamed) are silently
+  // dropped rather than showing a broken tile.
+  const recentSongs = useMemo(() => {
+    if (!recentIds.length) return [];
+    const byId = new Map(songs.map((s) => [s.id, s]));
+    const out: Song[] = [];
+    for (const id of recentIds) {
+      const song = byId.get(id);
+      if (song) out.push(song);
+    }
+    return out;
+  }, [recentIds, songs]);
+
+  // Same URI → Song bridge as playlists: playlists store trackUris,
+  // the player works with Song objects.
   const songByUri = useMemo(() => {
     const map = new Map<string, Song>();
     for (const s of songs) map.set(s.url, s);
@@ -175,6 +188,36 @@ export default function HomeScreen() {
           })}
         </ScrollView>
 
+        {/* ── Recently played ───────────────────────────── */}
+        {recentSongs.length > 0 && (
+          <>
+            <Text
+              style={[
+                styles.sectionTitle,
+                { color: colors.text, marginTop: 28 },
+              ]}
+            >
+              Recently played
+            </Text>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.recentRow}
+            >
+              {recentSongs.map((song, index) => (
+                <RecentTile
+                  key={song.id}
+                  song={song}
+                  colors={colors}
+                  design={design}
+                  onPress={() => playQueue(recentSongs, index)}
+                />
+              ))}
+            </ScrollView>
+          </>
+        )}
+
         {/* ── Curated & trending ────────────────────────── */}
         <Text
           style={[
@@ -267,6 +310,74 @@ export default function HomeScreen() {
 
       <MiniPlayer bottomOffset={0} />
     </SafeAreaView>
+  );
+}
+
+// ── Recent tile ──────────────────────────────────────────
+function RecentTile({
+  song,
+  colors,
+  design,
+  onPress,
+}: {
+  song: Song;
+  colors: any;
+  design: any;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.recentTile,
+        pressed && { opacity: 0.7 },
+      ]}
+    >
+      {song.artwork ? (
+        <Image
+          source={{ uri: song.artwork }}
+          style={[
+            styles.recentArt,
+            {
+              borderRadius: design.radius.item,
+              backgroundColor: colors.artPlaceholder,
+            },
+          ]}
+        />
+      ) : (
+        <View
+          style={[
+            styles.recentArt,
+            {
+              borderRadius: design.radius.item,
+              backgroundColor: colors.artPlaceholder,
+              alignItems: 'center',
+              justifyContent: 'center',
+            },
+          ]}
+        >
+          <Feather name="music" size={24} color={colors.iconMuted} />
+        </View>
+      )}
+      <Text
+        numberOfLines={1}
+        style={[
+          design.type.body,
+          { color: colors.text, fontWeight: '600', marginTop: 8 },
+        ]}
+      >
+        {song.title}
+      </Text>
+      <Text
+        numberOfLines={1}
+        style={[
+          design.type.caption,
+          { color: colors.textSecondary, marginTop: 2 },
+        ]}
+      >
+        {song.artist}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -376,9 +487,6 @@ function FeaturedCard({
 }
 
 // ── Playlist row ─────────────────────────────────────────
-// Takes already-resolved Song[] rather than the raw playlist, so
-// the parent can do the trackUris → Song lookup once and reuse it
-// for both the cover art and the play action.
 function PlaylistRow({
   name,
   songs,
@@ -526,6 +634,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingRight: 20,
+  },
+
+  // ── Recently played ──────────────────────────────────
+  recentRow: {
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    gap: 14,
+  },
+  recentTile: {
+    width: 130,
+  },
+  recentArt: {
+    width: 130,
+    height: 130,
   },
 
   // ── Featured card ────────────────────────────────────

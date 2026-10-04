@@ -25,10 +25,11 @@ type PlayerContextValue = {
   queue: Song[];
   queueIndex: number;
   isPlaying: boolean;
-  /** True while the player is waiting for data (streams, seeks on streams). */
   isBuffering: boolean;
   shuffle: boolean;
   repeatMode: RepeatMode;
+  /** Most-recently-played song IDs, newest first. Excludes duplicates. */
+  recentIds: string[];
   progress: { position: number; duration: number; buffered: number };
   playTrack: (track: Song, queue?: Song[]) => Promise<void>;
   playQueue: (queue: Song[], startIndex?: number) => Promise<void>;
@@ -43,11 +44,6 @@ type PlayerContextValue = {
 const PlayerContext = createContext<PlayerContextValue | null>(null);
 
 // ── Persisted preferences ──────────────────────────────────
-// shuffle + repeatMode. shuffleOrder is deliberately NOT persisted:
-// it's an index array into the queue, and the queue itself doesn't
-// survive a restart — it's rebuilt from whatever the user plays
-// next. startQueue regenerates the order from the shuffle flag, so
-// restoring the flag is sufficient.
 type PlayerPrefs = {
   shuffle: boolean;
   repeatMode: RepeatMode;
@@ -93,11 +89,6 @@ async function savePlayerPrefs(prefs: PlayerPrefs) {
 }
 
 // ── Persisted last-played state ────────────────────────────
-// Saves the track, the queue it belonged to, and the index within
-// that queue. Restored on mount so the player screen shows what
-// was last playing. Playback is NOT resumed automatically — the
-// source is loaded (paused) so the play button works immediately,
-// but no sound starts until the user presses play.
 type LastPlayed = {
   track: Song;
   queue: Song[];
@@ -134,10 +125,36 @@ async function saveLastPlayed(data: LastPlayed) {
   }
 }
 
+// ── Persisted recently-played list ─────────────────────────
+// Stores song IDs only, not full Song objects. The library is the
+// source of truth for track metadata; storing a snapshot would go
+// stale the moment a file is renamed or its tags change. IDs that
+// no longer resolve in the library silently drop from the list.
+const RECENT_KEY = 'player:recent:v1';
+const RECENT_LIMIT = 10;
+
+async function loadRecentIds(): Promise<string[]> {
+  try {
+    const raw = await AsyncStorage.getItem(RECENT_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((id): id is string => typeof id === 'string');
+  } catch (e) {
+    console.warn('[Player] failed to load recents:', e);
+    return [];
+  }
+}
+
+async function saveRecentIds(ids: string[]) {
+  try {
+    await AsyncStorage.setItem(RECENT_KEY, JSON.stringify(ids));
+  } catch (e) {
+    console.warn('[Player] failed to save recents:', e);
+  }
+}
+
 // ── Shuffle helper ─────────────────────────────────────────
-// Fisher-Yates shuffle over an index array, then move the
-// currently-playing index to position 0 so we don't jump tracks
-// the moment shuffle is enabled.
 function buildShuffleOrder(length: number, startAt: number): number[] {
   const indices = Array.from({ length }, (_, i) => i);
   for (let i = indices.length - 1; i > 0; i--) {
@@ -153,9 +170,6 @@ function buildShuffleOrder(length: number, startAt: number): number[] {
 }
 
 // ── Artwork URL validation ─────────────────────────────────
-// Android's setActiveForLockScreen only accepts http(s):// or
-// file:// URLs. Base64 data URIs throw MalformedURLException, so
-// we check before passing them through.
 function isUsableArtworkUrl(url: unknown): url is string {
   if (typeof url !== 'string') return false;
   return (
@@ -179,15 +193,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     DEFAULT_PREFS.repeatMode
   );
   const [shuffleOrder, setShuffleOrder] = useState<number[]>([]);
+  const [recentIds, setRecentIds] = useState<string[]>([]);
 
-  // Gate persistence writes until we've read what was stored.
-  // Without this, the persist effects below would run on the first
-  // render with defaults and clobber the saved values before the
-  // async reads resolve.
   const [hydrated, setHydrated] = useState(false);
 
-  // Refs mirror current state so async/event callbacks can read the
-  // latest values without being re-created on every change.
   const currentTrackRef = useRef(currentTrack);
   const queueRef = useRef(queue);
   const queueIndexRef = useRef(queueIndex);
@@ -220,17 +229,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       });
   }, []);
 
-  // ── Hydrate prefs + last-played once on mount ───────────
+  // ── Hydrate prefs + last-played + recents once on mount ─
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
       const prefs = await loadPlayerPrefs();
       const last = await loadLastPlayed();
+      const recents = await loadRecentIds();
       if (cancelled) return;
 
       setShuffle(prefs.shuffle);
       setRepeatMode(prefs.repeatMode);
+      setRecentIds(recents);
 
       if (last) {
         const safeIndex = Math.max(
@@ -247,7 +258,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Load the source WITHOUT playing, so the play button works
-        // immediately and the lock screen shows the last track.
+        // immediately and the lock screen shows the last track. This
+        // intentionally bypasses loadIntoPlayer() so restoring the
+        // app doesn't count as "playing" for the recently-played list.
         try {
           player.replace({ uri: last.track.url });
 
@@ -281,13 +294,29 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     savePlayerPrefs({ shuffle, repeatMode });
   }, [shuffle, repeatMode, hydrated]);
 
+  // ── Persist recents whenever the list changes ───────────
+  useEffect(() => {
+    if (!hydrated) return;
+    saveRecentIds(recentIds);
+  }, [recentIds, hydrated]);
+
+  // ── Record a track as recently played ───────────────────
+  // Moves the ID to the front and trims the tail. If the ID is
+  // already at the head, no-op — avoids a pointless state update
+  // when the same track restarts (e.g. repeat-one looping).
+  const recordRecent = useCallback((id: string) => {
+    setRecentIds((prev) => {
+      if (prev[0] === id) return prev;
+      const next = [id, ...prev.filter((x) => x !== id)];
+      return next.slice(0, RECENT_LIMIT);
+    });
+  }, []);
+
   // ── Persist last-played ─────────────────────────────────
   const persistLastPlayed = useCallback(() => {
     if (!hydratedRef.current) return;
-
     const track = currentTrackRef.current;
     if (!track) return;
-
     saveLastPlayed({
       track,
       queue: queueRef.current,
@@ -295,13 +324,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  // On track / queue / index change
   useEffect(() => {
     if (hydrated) persistLastPlayed();
   }, [currentTrack?.id, queue, queueIndex, hydrated, persistLastPlayed]);
 
-  // On app background — catches the case where the app is killed
-  // while playing, so the most recent track is what we restore.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'background' || state === 'inactive') {
@@ -316,24 +342,21 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     (song: Song) => {
       player.replace({ uri: song.url });
       player.play();
+      recordRecent(song.id);
 
       try {
         const artworkIsUsable = isUsableArtworkUrl(song.artwork);
-
         player.setActiveForLockScreen(true, {
           title: song.title,
           artist: song.artist,
           albumTitle: song.album ?? '',
-          // Only include artworkUrl when it's a real URL. Base64 data
-          // URIs break Android's URL parser, and passing nothing falls
-          // back to the app icon.
           ...(artworkIsUsable ? { artworkUrl: song.artwork } : {}),
         });
       } catch (e) {
         console.warn('[Player] setActiveForLockScreen failed:', e);
       }
     },
-    [player]
+    [player, recordRecent]
   );
 
   // ── High-level: start a new queue ───────────────────────
@@ -354,7 +377,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     [shuffle, loadIntoPlayer]
   );
 
-  // ── Advance within the existing queue ───────────────────
   const advanceTo = useCallback(
     async (index: number) => {
       const song = queue[index];
@@ -392,7 +414,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     else player.play();
   }, [player, status.playing]);
 
-  // ── Next ────────────────────────────────────────────────
   const next = useCallback(async () => {
     if (!queue.length) return;
 
@@ -426,11 +447,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     await advanceTo(nextIndex);
   }, [queue, queueIndex, shuffle, shuffleOrder, repeatMode, advanceTo, player]);
 
-  // ── Previous ────────────────────────────────────────────
   const previous = useCallback(async () => {
     if (!queue.length) return;
 
-    // Standard behavior: if we're past 3s, restart the current track.
     if ((status.currentTime ?? 0) > 3) {
       await player.seekTo(0);
       return;
@@ -486,7 +505,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     [player]
   );
 
-  // ── Auto-advance on finish ──────────────────────────────
   useEffect(() => {
     if (!status.didJustFinish) return;
 
@@ -499,7 +517,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     next();
   }, [status.didJustFinish, repeatMode, next, player]);
 
-  // ── Shuffle toggle ──────────────────────────────────────
   const toggleShuffle = useCallback(() => {
     setShuffle((prev) => {
       const nextVal = !prev;
@@ -512,7 +529,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     });
   }, [queue.length, queueIndex]);
 
-  // ── Repeat cycle: off → all → one → off ─────────────────
   const cycleRepeat = useCallback(() => {
     setRepeatMode((prev) =>
       prev === 'off' ? 'all' : prev === 'all' ? 'one' : 'off'
@@ -532,6 +548,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       isBuffering,
       shuffle,
       repeatMode,
+      recentIds,
       progress: {
         position: status.currentTime ?? 0,
         duration: status.duration ?? currentTrack?.duration ?? 0,
@@ -555,6 +572,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       isBuffering,
       shuffle,
       repeatMode,
+      recentIds,
       status.currentTime,
       status.duration,
       playTrack,
