@@ -12,6 +12,7 @@ import {
   useAudioPlayer,
   useAudioPlayerStatus,
 } from 'expo-audio';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Song } from './LibraryContext';
 
 export type RepeatMode = 'off' | 'all' | 'one';
@@ -38,6 +39,56 @@ type PlayerContextValue = {
 };
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
+
+// ── Persisted preferences ──────────────────────────────────
+// Only shuffle + repeatMode are persisted. shuffleOrder is
+// deliberately NOT persisted: it's an index array into the queue,
+// and the queue doesn't survive a restart — it's rebuilt from
+// whatever the user picks next. startQueue regenerates the order
+// from the shuffle flag, so restoring the flag is sufficient.
+type PlayerPrefs = {
+  shuffle: boolean;
+  repeatMode: RepeatMode;
+};
+
+const DEFAULT_PREFS: PlayerPrefs = {
+  shuffle: false,
+  repeatMode: 'off',
+};
+
+const PREFS_KEY = 'player:prefs:v1';
+
+async function loadPlayerPrefs(): Promise<PlayerPrefs> {
+  try {
+    const raw = await AsyncStorage.getItem(PREFS_KEY);
+    if (!raw) return DEFAULT_PREFS;
+
+    const parsed = JSON.parse(raw);
+    return {
+      shuffle:
+        typeof parsed?.shuffle === 'boolean'
+          ? parsed.shuffle
+          : DEFAULT_PREFS.shuffle,
+      repeatMode:
+        parsed?.repeatMode === 'off' ||
+        parsed?.repeatMode === 'all' ||
+        parsed?.repeatMode === 'one'
+          ? parsed.repeatMode
+          : DEFAULT_PREFS.repeatMode,
+    };
+  } catch (e) {
+    console.warn('[Player] failed to load prefs:', e);
+    return DEFAULT_PREFS;
+  }
+}
+
+async function savePlayerPrefs(prefs: PlayerPrefs) {
+  try {
+    await AsyncStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+  } catch (e) {
+    console.warn('[Player] failed to save prefs:', e);
+  }
+}
 
 // ── Shuffle helper ─────────────────────────────────────────
 // Fisher-Yates shuffle over an index array, then move the
@@ -79,9 +130,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [currentTrack, setCurrentTrack] = useState<Song | undefined>();
   const [ready, setReady] = useState(false);
 
-  const [shuffle, setShuffle] = useState(false);
-  const [repeatMode, setRepeatMode] = useState<RepeatMode>('off');
+  const [shuffle, setShuffle] = useState(DEFAULT_PREFS.shuffle);
+  const [repeatMode, setRepeatMode] = useState<RepeatMode>(
+    DEFAULT_PREFS.repeatMode
+  );
   const [shuffleOrder, setShuffleOrder] = useState<number[]>([]);
+
+  // Gate writes until we've read what was stored. Without this the
+  // persist effect below would run on the first render with defaults
+  // and overwrite the saved values before the load resolves.
+  const [prefsHydrated, setPrefsHydrated] = useState(false);
 
   // ── Audio session config ────────────────────────────────
   useEffect(() => {
@@ -96,6 +154,30 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         setReady(true);
       });
   }, []);
+
+  // ── Hydrate persisted prefs once on mount ───────────────
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      const prefs = await loadPlayerPrefs();
+      if (cancelled) return;
+
+      setShuffle(prefs.shuffle);
+      setRepeatMode(prefs.repeatMode);
+      setPrefsHydrated(true);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // ── Persist prefs whenever either value changes ─────────
+  useEffect(() => {
+    if (!prefsHydrated) return;
+    savePlayerPrefs({ shuffle, repeatMode });
+  }, [shuffle, repeatMode, prefsHydrated]);
 
   // ── Low-level: swap the track on the player ─────────────
   const loadIntoPlayer = useCallback(
