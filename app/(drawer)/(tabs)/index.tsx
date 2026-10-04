@@ -49,6 +49,21 @@ export default function HomeScreen() {
     else navigation.dispatch(DrawerActions.toggleDrawer());
   }, [navigation]);
 
+  // ── Time-based greeting ────────────────────────────────
+  // Computed once on mount. A typical session is minutes long,
+  // so the boundary case (user leaves the app open across noon)
+  // is not worth a timer. "Good night" bookends the very late
+  // and very early hours, matching the convention every music
+  // app uses.
+  const greeting = useMemo(() => {
+    const h = new Date().getHours();
+    if (h < 5) return 'Good night';
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    if (h < 21) return 'Good evening';
+    return 'Good night';
+  }, []);
+
   const firstName = useMemo(() => {
     const trimmed = profile.name?.trim();
     if (!trimmed) return 'there';
@@ -189,7 +204,7 @@ export default function HomeScreen() {
         </View>
 
         <Text style={[styles.greeting, { color: colors.text }]}>
-          Hi, <Text style={styles.greetingName}>{firstName}</Text>
+          {greeting}, <Text style={styles.greetingName}>{firstName}</Text>
         </Text>
 
         {/* ── Today's pick ─────────────────────────────── */}
@@ -233,7 +248,10 @@ export default function HomeScreen() {
 
         {/* ── Top tracks ───────────────────────────────── */}
         {topTracks.length > 0 && (
-          <Section title="Your top tracks">
+          <Section
+            title="Your top tracks"
+            onSeeAll={() => router.push('/top-tracks')}
+          >
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -366,10 +384,6 @@ export default function HomeScreen() {
 }
 
 // ── Section wrapper ──────────────────────────────────────
-// Section title + optional "See all" link. The title styling
-// lives in `sectionTitle` (no horizontal padding); the header
-// row applies `paddingHorizontal: 20` so both elements align to
-// the same left edge, and the row also carries `marginTop: 28`.
 function Section({
   title,
   onSeeAll,
@@ -725,9 +739,6 @@ const styles = StyleSheet.create({
   greetingName: { fontWeight: '400' },
 
   // ── Section header ───────────────────────────────────
-  // `paddingHorizontal: 20` so the title and the See all link
-  // both align with the 20px content gutter used elsewhere.
-  // `marginTop: 28` provides the gap from the previous section.
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -83,6 +83,10 @@ function ThemedStack() {
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen
+          name="top-tracks"
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
           name="player"
           options={{
             presentation: 'modal',
