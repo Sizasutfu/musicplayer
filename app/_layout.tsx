@@ -1,15 +1,13 @@
 // app/_layout.tsx
 import { LogBox } from 'react-native';
 
-// Silence the deprecation warning from a dependency still using the
-// old expo-file-system API. Remove once the dependency is updated.
 LogBox.ignoreLogs([
   'Method getInfoAsync imported from "expo-file-system" is deprecated',
 ]);
 
 import React, { useEffect, useState } from 'react';
-import { View, ActivityIndicator } from 'react-native';
-import { Stack } from 'expo-router';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -22,42 +20,41 @@ import { hasSeenOnboarding } from '../lib/onboarding';
 
 function ThemedStack() {
   const { colors, isDark } = useTheme();
-  const [onboarded, setOnboarded] = useState<boolean | null>(null);
+  const [bootstrapped, setBootstrapped] = useState(false);
+  const router = useRouter();
 
+  // One-time entry check. Runs once per app launch — never again.
+  //
+  // This is deliberately NOT keyed on segments. When the user
+  // finishes onboarding, welcome writes the flag and calls
+  // router.replace('/'). If this effect listened to segments, that
+  // navigation would re-trigger the check, still see the cached
+  // "not seen" state, and bounce straight back to welcome. An
+  // empty dep list sidesteps that entirely: entry routing happens
+  // once at boot, and welcome owns its own exit.
   useEffect(() => {
-    let mounted = true;
+    let cancelled = false;
+
     hasSeenOnboarding()
       .then((seen) => {
-        if (mounted) setOnboarded(seen);
+        if (cancelled) return;
+        if (!seen) router.replace('/welcome');
+        setBootstrapped(true);
       })
       .catch(() => {
-        if (mounted) setOnboarded(false);
+        if (!cancelled) setBootstrapped(true);
       });
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
-  if (onboarded === null) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: colors.background,
-        }}
-      >
-        <ActivityIndicator color={colors.primary} />
-      </View>
-    );
-  }
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <Stack
-        initialRouteName={onboarded ? '(drawer)' : 'welcome'}
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: colors.background },
@@ -85,6 +82,18 @@ function ThemedStack() {
           }}
         />
       </Stack>
+
+      {!bootstrapped && (
+        <View
+          style={[
+            StyleSheet.absoluteFillObject,
+            styles.overlay,
+            { backgroundColor: colors.background },
+          ]}
+        >
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      )}
     </>
   );
 }
@@ -108,3 +117,10 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  overlay: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
