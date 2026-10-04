@@ -43,17 +43,40 @@ export default function HomeScreen() {
     return trimmed.split(/\s+/)[0];
   }, [profile.name]);
 
-  const featured = useMemo(() => {
-    const song = songs[0];
+  // ── Today's pick ───────────────────────────────────────
+  // Deterministic daily rotation. The library is sorted by ID
+  // first so the pick stays stable even if the scanner returns
+  // tracks in a different order between sessions — otherwise
+  // rescanning your library would shuffle which song lands on
+  // which day.
+  const todaysPick = useMemo(() => {
+    if (!songs.length) return null;
+
+    const pool = [...songs].sort((a, b) => a.id.localeCompare(b.id));
+
+    const now = new Date();
+    const startOfYear = new Date(now.getFullYear(), 0, 0);
+    const dayOfYear = Math.floor(
+      (now.getTime() - startOfYear.getTime()) / 86400000
+    );
+
+    const song = pool[dayOfYear % pool.length];
     return {
-      title: 'Discover weekly',
-      subtitle: 'The original slow instrumental best playlists.',
-      artwork: song?.artwork,
+      song,
+      title: song.title,
+      subtitle: `${song.artist}${
+        song.album && song.album !== 'Unknown Album'
+          ? ` · ${song.album}`
+          : ''
+      }`,
+      artwork: song.artwork,
     };
   }, [songs]);
 
-  const handleFeaturedPlay = () => {
-    if (songs.length) playQueue(songs, 0);
+  const handlePickPlay = () => {
+    if (!todaysPick) return;
+    const idx = songs.findIndex((s) => s.id === todaysPick.song.id);
+    playQueue(songs, idx >= 0 ? idx : 0);
   };
 
   // Resolve recent IDs against the current library. IDs that no
@@ -171,24 +194,28 @@ export default function HomeScreen() {
           </>
         )}
 
-        {/* ── Curated & trending ────────────────────────── */}
-        <Text
-          style={[
-            styles.sectionTitle,
-            { color: colors.text, marginTop: 28 },
-          ]}
-        >
-          Curated & trending
-        </Text>
+        {/* ── Today's pick ──────────────────────────────── */}
+        {todaysPick && (
+          <>
+            <Text
+              style={[
+                styles.sectionTitle,
+                { color: colors.text, marginTop: 28 },
+              ]}
+            >
+              Today's pick
+            </Text>
 
-        <FeaturedCard
-          title={featured.title}
-          subtitle={featured.subtitle}
-          artwork={featured.artwork}
-          colors={colors}
-          design={design}
-          onPlay={handleFeaturedPlay}
-        />
+            <FeaturedCard
+              title={todaysPick.title}
+              subtitle={todaysPick.subtitle}
+              artwork={todaysPick.artwork}
+              colors={colors}
+              design={design}
+              onPlay={handlePickPlay}
+            />
+          </>
+        )}
 
         {/* ── Top daily playlists ───────────────────────── */}
         <View style={[styles.sectionHeader, { marginTop: 28 }]}>
