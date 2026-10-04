@@ -65,12 +65,7 @@ export default function TopTracksScreen() {
       >
         <View style={styles.topBar}>
           <BackButton />
-          <Text
-            style={[
-              design.type.caption,
-              { color: colors.text, fontWeight: '700' },
-            ]}
-          >
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
             Your top tracks
           </Text>
           <View style={styles.spacer} />
@@ -89,12 +84,7 @@ export default function TopTracksScreen() {
     >
       <View style={styles.topBar}>
         <BackButton />
-        <Text
-          style={[
-            design.type.caption,
-            { color: colors.text, fontWeight: '700' },
-          ]}
-        >
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
           Your top tracks
         </Text>
         <View style={styles.spacer} />
@@ -299,6 +289,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 4,
     paddingVertical: 6,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
   spacer: { width: 40, height: 40 },
   center: {

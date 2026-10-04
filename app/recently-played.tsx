@@ -9,7 +9,10 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useLibrary, type Song } from '../hooks/useLibrary';
 import { usePlayer } from '../context/PlayerContext';
@@ -22,6 +25,7 @@ export default function RecentlyPlayedScreen() {
   const { songs, loading } = useLibrary();
   const { playQueue, currentTrack, recentIds } = usePlayer();
   const { colors, design } = useTheme();
+  const insets = useSafeAreaInsets();
   const [actionSong, setActionSong] = useState<Song | null>(null);
 
   const recentSongs = useMemo(() => {
@@ -43,12 +47,7 @@ export default function RecentlyPlayedScreen() {
       >
         <View style={styles.topBar}>
           <BackButton />
-          <Text
-            style={[
-              design.type.caption,
-              { color: colors.text, fontWeight: '700' },
-            ]}
-          >
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
             Recently played
           </Text>
           <View style={styles.spacer} />
@@ -67,12 +66,7 @@ export default function RecentlyPlayedScreen() {
     >
       <View style={styles.topBar}>
         <BackButton />
-        <Text
-          style={[
-            design.type.caption,
-            { color: colors.text, fontWeight: '700' },
-          ]}
-        >
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
           Recently played
         </Text>
         <View style={styles.spacer} />
@@ -130,7 +124,7 @@ export default function RecentlyPlayedScreen() {
         </>
       )}
 
-      <MiniPlayer bottomOffset={0} />
+      <MiniPlayer bottomOffset={insets.bottom} />
 
       <SongActionSheet
         visible={!!actionSong}
@@ -245,6 +239,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 4,
     paddingVertical: 6,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
   spacer: { width: 40, height: 40 },
   center: {
