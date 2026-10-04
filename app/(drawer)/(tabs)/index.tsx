@@ -14,7 +14,7 @@ import { router, useNavigation } from 'expo-router';
 import { DrawerActions } from '@react-navigation/native';
 import { useProfile } from '../../../hooks/useProfile';
 import { usePlaylists } from '../../../hooks/usePlaylists';
-import { useLibrary } from '../../../hooks/useLibrary';
+import { useLibrary, type Song } from '../../../hooks/useLibrary';
 import { useTheme } from '../../../context/ThemeContext';
 import { usePlayer } from '../../../context/PlayerContext';
 import MiniPlayer from '../../../components/MiniPlayer';
@@ -66,6 +66,28 @@ export default function HomeScreen() {
   const handleFeaturedPlay = () => {
     if (songs.length) playQueue(songs, 0);
   };
+
+  // Build a URI → Song lookup once so each playlist row doesn't
+  // re-scan the library. Playlists store trackUris (strings), but
+  // the player works with Song objects — this bridges the two.
+  const songByUri = useMemo(() => {
+    const map = new Map<string, Song>();
+    for (const s of songs) map.set(s.url, s);
+    return map;
+  }, [songs]);
+
+  const resolvePlaylistSongs = useCallback(
+    (trackUris: string[] | undefined): Song[] => {
+      if (!trackUris?.length) return [];
+      const out: Song[] = [];
+      for (const uri of trackUris) {
+        const song = songByUri.get(uri);
+        if (song) out.push(song);
+      }
+      return out;
+    },
+    [songByUri]
+  );
 
   return (
     <SafeAreaView
@@ -223,18 +245,22 @@ export default function HomeScreen() {
               </Text>
             </View>
           ) : (
-            playlists.slice(0, 5).map((p: any) => (
-              <PlaylistRow
-                key={p.id}
-                playlist={p}
-                colors={colors}
-                design={design}
-                onPress={() => router.push(`/playlist/${p.id}`)}
-                onPlay={() => {
-                  if (p.songs?.length) playQueue(p.songs, 0);
-                }}
-              />
-            ))
+            playlists.slice(0, 5).map((p) => {
+              const resolved = resolvePlaylistSongs(p.trackUris);
+              return (
+                <PlaylistRow
+                  key={p.id}
+                  name={p.name}
+                  songs={resolved}
+                  colors={colors}
+                  design={design}
+                  onPress={() => router.push(`/playlist/${p.id}`)}
+                  onPlay={() => {
+                    if (resolved.length) playQueue(resolved, 0);
+                  }}
+                />
+              );
+            })
           )}
         </View>
       </ScrollView>
@@ -350,22 +376,27 @@ function FeaturedCard({
 }
 
 // ── Playlist row ─────────────────────────────────────────
+// Takes already-resolved Song[] rather than the raw playlist, so
+// the parent can do the trackUris → Song lookup once and reuse it
+// for both the cover art and the play action.
 function PlaylistRow({
-  playlist,
+  name,
+  songs,
   colors,
   design,
   onPress,
   onPlay,
 }: {
-  playlist: any;
+  name: string;
+  songs: Song[];
   colors: any;
   design: any;
   onPress: () => void;
   onPlay: () => void;
 }) {
-  const cover =
-    playlist.coverUri ?? playlist.songs?.[0]?.artwork ?? undefined;
-  const songCount = playlist.songs?.length ?? 0;
+  const cover = songs[0]?.artwork;
+  const artist = songs[0]?.artist;
+  const songCount = songs.length;
 
   return (
     <Pressable
@@ -408,7 +439,7 @@ function PlaylistRow({
             { color: colors.text, fontWeight: '700' },
           ]}
         >
-          {playlist.name}
+          {name}
         </Text>
         <Text
           numberOfLines={1}
@@ -417,17 +448,19 @@ function PlaylistRow({
             { color: colors.textSecondary, marginTop: 2 },
           ]}
         >
-          {playlist.artist ? `By ${playlist.artist} · ` : ''}
+          {artist ? `By ${artist} · ` : ''}
           {songCount} {songCount === 1 ? 'Song' : 'Songs'}
         </Text>
       </View>
 
       <Pressable
         onPress={onPlay}
+        disabled={songCount === 0}
         hitSlop={10}
         style={[
           styles.playlistPlayBtn,
           { backgroundColor: colors.chipBg },
+          songCount === 0 && { opacity: 0.4 },
         ]}
       >
         <Feather name="play" size={16} color={colors.icon} />
