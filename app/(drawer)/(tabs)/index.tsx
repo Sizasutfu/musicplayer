@@ -15,16 +15,28 @@ import { DrawerActions } from '@react-navigation/native';
 import { useProfile } from '../../../hooks/useProfile';
 import { usePlaylists } from '../../../hooks/usePlaylists';
 import { useLibrary, type Song } from '../../../hooks/useLibrary';
+import { useRecentlyAdded } from '../../../hooks/useRecentlyAdded';
 import { useTheme } from '../../../context/ThemeContext';
 import { usePlayer } from '../../../context/PlayerContext';
 import MiniPlayer from '../../../components/MiniPlayer';
+
+function relativeTime(ms: number): string {
+  const diff = Date.now() - ms;
+  const days = Math.floor(diff / 86400000);
+  if (days <= 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days} days ago`;
+  if (days < 14) return 'Last week';
+  if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+  return `${Math.floor(days / 30)} months ago`;
+}
 
 export default function HomeScreen() {
   const { profile } = useProfile();
   const { playlists } = usePlaylists();
   const { songs } = useLibrary();
   const { colors, design } = useTheme();
-  const { playQueue, recentIds } = usePlayer();
+  const { playQueue, recentIds, playCounts } = usePlayer();
   const navigation = useNavigation();
 
   useLayoutEffect(() => {
@@ -44,11 +56,6 @@ export default function HomeScreen() {
   }, [profile.name]);
 
   // ── Today's pick ───────────────────────────────────────
-  // Deterministic daily rotation. The library is sorted by ID
-  // first so the pick stays stable even if the scanner returns
-  // tracks in a different order between sessions — otherwise
-  // rescanning your library would shuffle which song lands on
-  // which day.
   const todaysPick = useMemo(() => {
     if (!songs.length) return null;
 
@@ -79,9 +86,7 @@ export default function HomeScreen() {
     playQueue(songs, idx >= 0 ? idx : 0);
   };
 
-  // Resolve recent IDs against the current library. IDs that no
-  // longer exist (file deleted, folder renamed) are silently
-  // dropped rather than showing a broken tile.
+  // ── Recently played ────────────────────────────────────
   const recentSongs = useMemo(() => {
     if (!recentIds.length) return [];
     const byId = new Map(songs.map((s) => [s.id, s]));
@@ -93,8 +98,31 @@ export default function HomeScreen() {
     return out;
   }, [recentIds, songs]);
 
-  // Same URI → Song bridge as playlists: playlists store trackUris,
-  // the player works with Song objects.
+  // ── Top tracks ─────────────────────────────────────────
+  const topTracks = useMemo(() => {
+    if (!songs.length) return [];
+    const byId = new Map(songs.map((s) => [s.id, s]));
+    const ranked = Object.entries(playCounts)
+      .filter(([, n]) => n > 0)
+      .map(([id, count]) => {
+        const song = byId.get(id);
+        return song ? { song, count } : null;
+      })
+      .filter((x): x is { song: Song; count: number } => x !== null)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    return ranked.length >= 3 ? ranked : [];
+  }, [songs, playCounts]);
+
+  // ── Recently added ─────────────────────────────────────
+  const recentlyAdded = useRecentlyAdded(songs);
+  const recentlyAddedTop = useMemo(
+    () => recentlyAdded.slice(0, 10),
+    [recentlyAdded]
+  );
+
+  // ── Playlist resolution ────────────────────────────────
   const songByUri = useMemo(() => {
     const map = new Map<string, Song>();
     for (const s of songs) map.set(s.url, s);
@@ -123,7 +151,7 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Header: hamburger + greeting actions ─────── */}
+        {/* ── Header ────────────────────────────────────── */}
         <View style={styles.header}>
           <Pressable
             onPress={openDrawer}
@@ -164,48 +192,9 @@ export default function HomeScreen() {
           Hi, <Text style={styles.greetingName}>{firstName}</Text>
         </Text>
 
-        {/* ── Recently played ───────────────────────────── */}
-        {recentSongs.length > 0 && (
-          <>
-            <Text
-              style={[
-                styles.sectionTitle,
-                { color: colors.text, marginTop: 28 },
-              ]}
-            >
-              Recently played
-            </Text>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.recentRow}
-            >
-              {recentSongs.map((song, index) => (
-                <RecentTile
-                  key={song.id}
-                  song={song}
-                  colors={colors}
-                  design={design}
-                  onPress={() => playQueue(recentSongs, index)}
-                />
-              ))}
-            </ScrollView>
-          </>
-        )}
-
-        {/* ── Today's pick ──────────────────────────────── */}
+        {/* ── Today's pick ─────────────────────────────── */}
         {todaysPick && (
-          <>
-            <Text
-              style={[
-                styles.sectionTitle,
-                { color: colors.text, marginTop: 28 },
-              ]}
-            >
-              Today's pick
-            </Text>
-
+          <Section title="Today's pick">
             <FeaturedCard
               title={todaysPick.title}
               subtitle={todaysPick.subtitle}
@@ -214,11 +203,94 @@ export default function HomeScreen() {
               design={design}
               onPlay={handlePickPlay}
             />
-          </>
+          </Section>
         )}
 
-        {/* ── Top daily playlists ───────────────────────── */}
-        <View style={[styles.sectionHeader, { marginTop: 28 }]}>
+        {/* ── Recently played ──────────────────────────── */}
+        {recentSongs.length > 0 && (
+          <Section
+            title="Recently played"
+            onSeeAll={() => router.push('/recently-played')}
+          >
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.tileRow}
+            >
+              {recentSongs.map((song, index) => (
+                <SongTile
+                  key={song.id}
+                  song={song}
+                  subtitle={song.artist}
+                  colors={colors}
+                  design={design}
+                  onPress={() => playQueue(recentSongs, index)}
+                />
+              ))}
+            </ScrollView>
+          </Section>
+        )}
+
+        {/* ── Top tracks ───────────────────────────────── */}
+        {topTracks.length > 0 && (
+          <Section title="Your top tracks">
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.tileRow}
+            >
+              {topTracks.map(({ song }, index) => (
+                <SongTile
+                  key={song.id}
+                  song={song}
+                  subtitle={song.artist}
+                  rank={index + 1}
+                  colors={colors}
+                  design={design}
+                  onPress={() =>
+                    playQueue(
+                      topTracks.map((t) => t.song),
+                      index
+                    )
+                  }
+                />
+              ))}
+            </ScrollView>
+          </Section>
+        )}
+
+        {/* ── Recently added ───────────────────────────── */}
+        {recentlyAddedTop.length > 0 && (
+          <Section
+            title="Recently added"
+            onSeeAll={() => router.push('/recently-added')}
+          >
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.tileRow}
+            >
+              {recentlyAddedTop.map(({ song, addedAt }, index) => (
+                <SongTile
+                  key={song.id}
+                  song={song}
+                  subtitle={relativeTime(addedAt)}
+                  colors={colors}
+                  design={design}
+                  onPress={() =>
+                    playQueue(
+                      recentlyAddedTop.map((r) => r.song),
+                      index
+                    )
+                  }
+                />
+              ))}
+            </ScrollView>
+          </Section>
+        )}
+
+        {/* ── Top daily playlists ──────────────────────── */}
+        <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
             Top daily playlists
           </Text>
@@ -293,14 +365,57 @@ export default function HomeScreen() {
   );
 }
 
-// ── Recent tile ──────────────────────────────────────────
-function RecentTile({
+// ── Section wrapper ──────────────────────────────────────
+// Section title + optional "See all" link. The title styling
+// lives in `sectionTitle` (no horizontal padding); the header
+// row applies `paddingHorizontal: 20` so both elements align to
+// the same left edge, and the row also carries `marginTop: 28`.
+function Section({
+  title,
+  onSeeAll,
+  children,
+}: {
+  title: string;
+  onSeeAll?: () => void;
+  children: React.ReactNode;
+}) {
+  const { colors, design } = useTheme();
+  return (
+    <>
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          {title}
+        </Text>
+        {onSeeAll && (
+          <Pressable onPress={onSeeAll} hitSlop={8}>
+            <Text
+              style={[
+                design.type.caption,
+                { color: colors.textSecondary, fontWeight: '600' },
+              ]}
+            >
+              See all
+            </Text>
+          </Pressable>
+        )}
+      </View>
+      {children}
+    </>
+  );
+}
+
+// ── Song tile ────────────────────────────────────────────
+function SongTile({
   song,
+  subtitle,
+  rank,
   colors,
   design,
   onPress,
 }: {
   song: Song;
+  subtitle: string;
+  rank?: number;
   colors: any;
   design: any;
   onPress: () => void;
@@ -309,36 +424,55 @@ function RecentTile({
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
-        styles.recentTile,
+        styles.tile,
         pressed && { opacity: 0.7 },
       ]}
     >
-      {song.artwork ? (
-        <Image
-          source={{ uri: song.artwork }}
-          style={[
-            styles.recentArt,
-            {
-              borderRadius: design.radius.item,
-              backgroundColor: colors.artPlaceholder,
-            },
-          ]}
-        />
-      ) : (
-        <View
-          style={[
-            styles.recentArt,
-            {
-              borderRadius: design.radius.item,
-              backgroundColor: colors.artPlaceholder,
-              alignItems: 'center',
-              justifyContent: 'center',
-            },
-          ]}
-        >
-          <Feather name="music" size={24} color={colors.iconMuted} />
-        </View>
-      )}
+      <View>
+        {song.artwork ? (
+          <Image
+            source={{ uri: song.artwork }}
+            style={[
+              styles.tileArt,
+              {
+                borderRadius: design.radius.item,
+                backgroundColor: colors.artPlaceholder,
+              },
+            ]}
+          />
+        ) : (
+          <View
+            style={[
+              styles.tileArt,
+              {
+                borderRadius: design.radius.item,
+                backgroundColor: colors.artPlaceholder,
+                alignItems: 'center',
+                justifyContent: 'center',
+              },
+            ]}
+          >
+            <Feather name="music" size={24} color={colors.iconMuted} />
+          </View>
+        )}
+        {rank !== undefined && (
+          <View
+            style={[
+              styles.rankBadge,
+              { backgroundColor: colors.primary },
+            ]}
+          >
+            <Text
+              style={[
+                styles.rankText,
+                { color: colors.primaryText },
+              ]}
+            >
+              {rank}
+            </Text>
+          </View>
+        )}
+      </View>
       <Text
         numberOfLines={1}
         style={[
@@ -355,7 +489,7 @@ function RecentTile({
           { color: colors.textSecondary, marginTop: 2 },
         ]}
       >
-        {song.artist}
+        {subtitle}
       </Text>
     </Pressable>
   );
@@ -588,35 +722,47 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginTop: 20,
   },
-  greetingName: {
-    fontWeight: '400',
-  },
+  greetingName: { fontWeight: '400' },
 
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-    paddingHorizontal: 20,
-  },
+  // ── Section header ───────────────────────────────────
+  // `paddingHorizontal: 20` so the title and the See all link
+  // both align with the 20px content gutter used elsewhere.
+  // `marginTop: 28` provides the gap from the previous section.
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingRight: 20,
+    paddingHorizontal: 20,
+    marginTop: 28,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.3,
   },
 
-  // ── Recently played ──────────────────────────────────
-  recentRow: {
+  // ── Tiles (recent / top / added) ─────────────────────
+  tileRow: {
     paddingHorizontal: 20,
     paddingTop: 14,
     gap: 14,
   },
-  recentTile: {
-    width: 130,
+  tile: { width: 130 },
+  tileArt: { width: 130, height: 130 },
+  rankBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  recentArt: {
-    width: 130,
-    height: 130,
+  rankText: {
+    fontSize: 12,
+    fontWeight: '800',
   },
 
   // ── Featured card ────────────────────────────────────
@@ -645,9 +791,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  featuredIcon: {
-    padding: 4,
-  },
+  featuredIcon: { padding: 4 },
   featuredArt: {
     width: 150,
     height: '100%',

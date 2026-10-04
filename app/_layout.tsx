@@ -75,6 +75,14 @@ function ThemedStack() {
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen
+          name="recently-played"
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="recently-added"
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
           name="player"
           options={{
             presentation: 'modal',

@@ -30,6 +30,8 @@ type PlayerContextValue = {
   repeatMode: RepeatMode;
   /** Most-recently-played song IDs, newest first. Excludes duplicates. */
   recentIds: string[];
+  /** Play count per song ID. Increments once each time a track starts. */
+  playCounts: Record<string, number>;
   progress: { position: number; duration: number; buffered: number };
   playTrack: (track: Song, queue?: Song[]) => Promise<void>;
   playQueue: (queue: Song[], startIndex?: number) => Promise<void>;
@@ -126,10 +128,6 @@ async function saveLastPlayed(data: LastPlayed) {
 }
 
 // ── Persisted recently-played list ─────────────────────────
-// Stores song IDs only, not full Song objects. The library is the
-// source of truth for track metadata; storing a snapshot would go
-// stale the moment a file is renamed or its tags change. IDs that
-// no longer resolve in the library silently drop from the list.
 const RECENT_KEY = 'player:recent:v1';
 const RECENT_LIMIT = 10;
 
@@ -151,6 +149,39 @@ async function saveRecentIds(ids: string[]) {
     await AsyncStorage.setItem(RECENT_KEY, JSON.stringify(ids));
   } catch (e) {
     console.warn('[Player] failed to save recents:', e);
+  }
+}
+
+// ── Persisted play counts ──────────────────────────────────
+// Keyed by song ID. No pruning here — the map is small and stale
+// entries are harmless. If it ever grows large (thousands of
+// entries from one-off plays), add a threshold in settings.
+const PLAYS_KEY = 'player:plays:v1';
+
+async function loadPlayCounts(): Promise<Record<string, number>> {
+  try {
+    const raw = await AsyncStorage.getItem(PLAYS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {};
+    }
+    const out: Record<string, number> = {};
+    for (const [k, v] of Object.entries(parsed)) {
+      if (typeof v === 'number' && v > 0) out[k] = v;
+    }
+    return out;
+  } catch (e) {
+    console.warn('[Player] failed to load play counts:', e);
+    return {};
+  }
+}
+
+async function savePlayCounts(counts: Record<string, number>) {
+  try {
+    await AsyncStorage.setItem(PLAYS_KEY, JSON.stringify(counts));
+  } catch (e) {
+    console.warn('[Player] failed to save play counts:', e);
   }
 }
 
@@ -194,6 +225,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   );
   const [shuffleOrder, setShuffleOrder] = useState<number[]>([]);
   const [recentIds, setRecentIds] = useState<string[]>([]);
+  const [playCounts, setPlayCounts] = useState<Record<string, number>>({});
 
   const [hydrated, setHydrated] = useState(false);
 
@@ -229,7 +261,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       });
   }, []);
 
-  // ── Hydrate prefs + last-played + recents once on mount ─
+  // ── Hydrate once on mount ───────────────────────────────
   useEffect(() => {
     let cancelled = false;
 
@@ -237,11 +269,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       const prefs = await loadPlayerPrefs();
       const last = await loadLastPlayed();
       const recents = await loadRecentIds();
+      const plays = await loadPlayCounts();
       if (cancelled) return;
 
       setShuffle(prefs.shuffle);
       setRepeatMode(prefs.repeatMode);
       setRecentIds(recents);
+      setPlayCounts(plays);
 
       if (last) {
         const safeIndex = Math.max(
@@ -257,10 +291,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           setShuffleOrder(buildShuffleOrder(last.queue.length, safeIndex));
         }
 
-        // Load the source WITHOUT playing, so the play button works
-        // immediately and the lock screen shows the last track. This
-        // intentionally bypasses loadIntoPlayer() so restoring the
-        // app doesn't count as "playing" for the recently-played list.
         try {
           player.replace({ uri: last.track.url });
 
@@ -288,28 +318,39 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
   }, [player]);
 
-  // ── Persist prefs whenever either value changes ─────────
   useEffect(() => {
     if (!hydrated) return;
     savePlayerPrefs({ shuffle, repeatMode });
   }, [shuffle, repeatMode, hydrated]);
 
-  // ── Persist recents whenever the list changes ───────────
   useEffect(() => {
     if (!hydrated) return;
     saveRecentIds(recentIds);
   }, [recentIds, hydrated]);
 
+  useEffect(() => {
+    if (!hydrated) return;
+    savePlayCounts(playCounts);
+  }, [playCounts, hydrated]);
+
   // ── Record a track as recently played ───────────────────
-  // Moves the ID to the front and trims the tail. If the ID is
-  // already at the head, no-op — avoids a pointless state update
-  // when the same track restarts (e.g. repeat-one looping).
   const recordRecent = useCallback((id: string) => {
     setRecentIds((prev) => {
       if (prev[0] === id) return prev;
       const next = [id, ...prev.filter((x) => x !== id)];
       return next.slice(0, RECENT_LIMIT);
     });
+  }, []);
+
+  // ── Increment the play count for a track ────────────────
+  // Fires once per track start, from loadIntoPlayer. Repeat-one
+  // looping just seeks back to 0 without re-entering loadIntoPlayer,
+  // so a looped track counts once per user-initiated start.
+  const recordPlay = useCallback((id: string) => {
+    setPlayCounts((prev) => ({
+      ...prev,
+      [id]: (prev[id] ?? 0) + 1,
+    }));
   }, []);
 
   // ── Persist last-played ─────────────────────────────────
@@ -343,6 +384,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       player.replace({ uri: song.url });
       player.play();
       recordRecent(song.id);
+      recordPlay(song.id);
 
       try {
         const artworkIsUsable = isUsableArtworkUrl(song.artwork);
@@ -356,10 +398,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         console.warn('[Player] setActiveForLockScreen failed:', e);
       }
     },
-    [player, recordRecent]
+    [player, recordRecent, recordPlay]
   );
 
-  // ── High-level: start a new queue ───────────────────────
   const startQueue = useCallback(
     async (list: Song[], index: number) => {
       const song = list[index];
@@ -549,6 +590,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       shuffle,
       repeatMode,
       recentIds,
+      playCounts,
       progress: {
         position: status.currentTime ?? 0,
         duration: status.duration ?? currentTrack?.duration ?? 0,
@@ -573,6 +615,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       shuffle,
       repeatMode,
       recentIds,
+      playCounts,
       status.currentTime,
       status.duration,
       playTrack,
