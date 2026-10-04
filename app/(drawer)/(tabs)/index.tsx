@@ -1,5 +1,5 @@
 // app/(drawer)/(tabs)/index.tsx
-import React, { useCallback, useLayoutEffect, useMemo, useState } from 'react';
+import React, { useCallback, useLayoutEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -19,15 +19,6 @@ import { useTheme } from '../../../context/ThemeContext';
 import { usePlayer } from '../../../context/PlayerContext';
 import MiniPlayer from '../../../components/MiniPlayer';
 
-type Category = 'all' | 'new' | 'trending' | 'top';
-
-const CATEGORIES: { key: Category; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'new', label: 'New Release' },
-  { key: 'trending', label: 'Trending' },
-  { key: 'top', label: 'Top' },
-];
-
 export default function HomeScreen() {
   const { profile } = useProfile();
   const { playlists } = usePlaylists();
@@ -35,8 +26,6 @@ export default function HomeScreen() {
   const { colors, design } = useTheme();
   const { playQueue, recentIds } = usePlayer();
   const navigation = useNavigation();
-
-  const [category, setCategory] = useState<Category>('all');
 
   useLayoutEffect(() => {
     navigation.setOptions({ headerShown: false });
@@ -151,42 +140,6 @@ export default function HomeScreen() {
         <Text style={[styles.greeting, { color: colors.text }]}>
           Hi, <Text style={styles.greetingName}>{firstName}</Text>
         </Text>
-
-        {/* ── Categories ─────────────────────────────────── */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesRow}
-        >
-          {CATEGORIES.map((c) => {
-            const active = category === c.key;
-            return (
-              <Pressable
-                key={c.key}
-                onPress={() => setCategory(c.key)}
-                style={[
-                  styles.categoryChip,
-                  { backgroundColor: colors.chipBg },
-                  active && { backgroundColor: colors.primary },
-                ]}
-              >
-                <Text
-                  style={[
-                    design.type.caption,
-                    {
-                      color: colors.chipText,
-                      fontWeight: '700',
-                      fontSize: 14,
-                    },
-                    active && { color: colors.primaryText },
-                  ]}
-                >
-                  {c.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
 
         {/* ── Recently played ───────────────────────────── */}
         {recentSongs.length > 0 && (
@@ -610,17 +563,6 @@ const styles = StyleSheet.create({
   },
   greetingName: {
     fontWeight: '400',
-  },
-
-  categoriesRow: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    gap: 8,
-  },
-  categoryChip: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 999,
   },
 
   sectionTitle: {
