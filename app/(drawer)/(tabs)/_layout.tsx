@@ -119,7 +119,7 @@ export default function TabsLayout() {
         name="favorites"
         options={{
           href: null,
-          headerShown: false,
+          headerShown: true,
         }}
       />
     </Tabs>

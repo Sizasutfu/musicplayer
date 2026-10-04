@@ -14,6 +14,7 @@ import { useLibrary, type Song } from '../../../hooks/useLibrary';
 import { usePlayer } from '../../../context/PlayerContext';
 import { useFavorites } from '../../../hooks/useFavorites';
 import { useTheme } from '../../../context/ThemeContext';
+import { useHeaderBack } from '../../../hooks/useHeaderBack';
 import MiniPlayer from '../../../components/MiniPlayer';
 import SongActionSheet from '../../../components/SongActionSheet';
 import LikeButton from '../../../components/LikeButton';
@@ -25,6 +26,8 @@ export default function FavoritesScreen() {
   const { colors, design } = useTheme();
 
   const [actionSong, setActionSong] = useState<Song | null>(null);
+
+  useHeaderBack('Favorites');
 
   const favoriteTracks: Song[] = useMemo(() => {
     const byUri = new Map<string, Song>();
