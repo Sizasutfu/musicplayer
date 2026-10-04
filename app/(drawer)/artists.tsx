@@ -14,11 +14,14 @@ import { router } from 'expo-router';
 import { useLibrary } from '../../hooks/useLibrary';
 import { groupByArtist, type Artist } from '../../lib/metadata';
 import { useTheme } from '../../context/ThemeContext';
+import { useHeaderBack } from '../../hooks/useHeaderBack';
 import MiniPlayer from '../../components/MiniPlayer';
 
 export default function ArtistsScreen() {
   const { songs, loading } = useLibrary();
   const { colors, design } = useTheme();
+
+  useHeaderBack('Artists');
 
   const artists = useMemo(() => groupByArtist(songs), [songs]);
 

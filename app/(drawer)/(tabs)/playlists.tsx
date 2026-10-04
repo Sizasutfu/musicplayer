@@ -18,12 +18,9 @@ import { router } from 'expo-router';
 import { usePlaylists } from '../../../hooks/usePlaylists';
 import { useLibrary } from '../../../hooks/useLibrary';
 import { useTheme } from '../../../context/ThemeContext';
+import { useHeaderBack } from '../../../hooks/useHeaderBack';
 import MiniPlayer from '../../../components/MiniPlayer';
 
-// Mini player's own rendered height inside a tab screen: 40px artwork
-// + 10px top/bottom padding = 60px. Kept as a constant since MiniPlayer
-// sits at bottom: 0 here (flush on the tab bar) rather than offset by
-// tab bar height.
 const MINI_PLAYER_HEIGHT = 60;
 const FAB_GAP_ABOVE_MINI_PLAYER = 16;
 
@@ -34,6 +31,8 @@ export default function PlaylistsScreen() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState('');
+
+  useHeaderBack('Playlists');
 
   const handleCreate = async () => {
     if (!newName.trim()) return;

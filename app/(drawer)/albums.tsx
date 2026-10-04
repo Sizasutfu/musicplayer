@@ -15,6 +15,7 @@ import { router } from 'expo-router';
 import { useLibrary } from '../../hooks/useLibrary';
 import { groupByAlbum, type Album } from '../../lib/metadata';
 import { useTheme } from '../../context/ThemeContext';
+import { useHeaderBack } from '../../hooks/useHeaderBack';
 import MiniPlayer from '../../components/MiniPlayer';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -27,6 +28,8 @@ const TILE_SIZE =
 export default function AlbumsScreen() {
   const { songs, loading } = useLibrary();
   const { colors, design } = useTheme();
+
+  useHeaderBack('Albums');
 
   const albums = useMemo(() => groupByAlbum(songs), [songs]);
 

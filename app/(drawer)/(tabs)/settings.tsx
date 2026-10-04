@@ -18,6 +18,7 @@ import { useTheme } from '../../../context/ThemeContext';
 import { clearCache } from '../../../lib/metadata';
 import { resetOnboarding } from '../../../lib/onboarding';
 import { useLibrary } from '../../../hooks/useLibrary';
+import { useHeaderBack } from '../../../hooks/useHeaderBack';
 import MiniPlayer from '../../../components/MiniPlayer';
 
 type IconName = React.ComponentProps<typeof Feather>['name'];
@@ -45,6 +46,8 @@ export default function SettingsScreen() {
   const { refresh, songs } = useLibrary();
   const [busy, setBusy] = useState<string | null>(null);
   const [durationOpen, setDurationOpen] = useState(false);
+
+  useHeaderBack('Settings');
 
   const runClearCache = async () => {
     setBusy('clear-cache');
@@ -275,7 +278,6 @@ export default function SettingsScreen() {
         </Text>
       </ScrollView>
 
-      {/* ── Duration picker modal ───────────────────────── */}
       <Modal
         visible={durationOpen}
         transparent

@@ -20,6 +20,7 @@ import { useProfile } from '../../hooks/useProfile';
 import { usePlaylists } from '../../hooks/usePlaylists';
 import { useLibrary } from '../../hooks/useLibrary';
 import { useTheme } from '../../context/ThemeContext';
+import { useHeaderBack } from '../../hooks/useHeaderBack';
 import {
   AVATAR_COLORS,
   deleteAvatarFile,
@@ -44,6 +45,8 @@ export default function ProfileScreen() {
   const [editField, setEditField] = useState<EditField>(null);
   const [draft, setDraft] = useState('');
   const [pickerVisible, setPickerVisible] = useState(false);
+
+  useHeaderBack('Profile');
 
   const openEdit = (field: Exclude<EditField, null>) => {
     setEditField(field);

@@ -1,547 +1,385 @@
 // app/(drawer)/(tabs)/index.tsx
-import React, {
-  useCallback,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useCallback, useLayoutEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
-  FlatList,
+  ScrollView,
   Pressable,
-  TextInput,
-  ActivityIndicator,
   StyleSheet,
-  Platform,
   Image,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useNavigation, router } from 'expo-router';
+import { router, useNavigation } from 'expo-router';
 import { DrawerActions } from '@react-navigation/native';
-import { useLibrary, type Song } from '../../../hooks/useLibrary';
-import { useCircleTracks } from '../../../hooks/useCircleTracks';
-import { isCircleSong, likeKey } from '../../../lib/circle';
-import { usePlayer } from '../../../context/PlayerContext';
-import { useTheme } from '../../../context/ThemeContext';
 import { useProfile } from '../../../hooks/useProfile';
-import ProfileAvatar from '../../../components/ProfileAvatar';
+import { usePlaylists } from '../../../hooks/usePlaylists';
+import { useLibrary } from '../../../hooks/useLibrary';
+import { useTheme } from '../../../context/ThemeContext';
+import { usePlayer } from '../../../context/PlayerContext';
 import MiniPlayer from '../../../components/MiniPlayer';
-import SongActionSheet from '../../../components/SongActionSheet';
-import LikeButton from '../../../components/LikeButton';
 
-type SortMode = 'title' | 'artist' | 'album';
-type Source = 'device' | 'circle';
+type Category = 'all' | 'new' | 'trending' | 'top';
 
-function MenuButton() {
-  const navigation = useNavigation<any>();
-  const { colors } = useTheme();
+const CATEGORIES: { key: Category; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'new', label: 'New Release' },
+  { key: 'trending', label: 'Trending' },
+  { key: 'top', label: 'Top' },
+];
 
-  const openDrawer = () => {
+export default function HomeScreen() {
+  const { profile } = useProfile();
+  const { playlists } = usePlaylists();
+  const { songs } = useLibrary();
+  const { colors, design } = useTheme();
+  const { playQueue } = usePlayer();
+  const navigation = useNavigation();
+
+  const [category, setCategory] = useState<Category>('all');
+
+  useLayoutEffect(() => {
+    navigation.setOptions({ headerShown: false });
+  }, [navigation]);
+
+  const openDrawer = useCallback(() => {
     const parent = navigation.getParent?.();
-    if (parent) {
-      parent.dispatch(DrawerActions.toggleDrawer());
-    } else {
-      navigation.dispatch(DrawerActions.toggleDrawer());
-    }
+    if (parent) parent.dispatch(DrawerActions.toggleDrawer());
+    else navigation.dispatch(DrawerActions.toggleDrawer());
+  }, [navigation]);
+
+  const firstName = useMemo(() => {
+    const trimmed = profile.name?.trim();
+    if (!trimmed) return 'there';
+    return trimmed.split(/\s+/)[0];
+  }, [profile.name]);
+
+  const featured = useMemo(() => {
+    const song = songs[0];
+    return {
+      title: 'Discover weekly',
+      subtitle: 'The original slow instrumental best playlists.',
+      artwork: song?.artwork,
+    };
+  }, [songs]);
+
+  const handleFeaturedPlay = () => {
+    if (songs.length) playQueue(songs, 0);
   };
 
   return (
-    <Pressable onPress={openDrawer} hitSlop={10} style={styles.headerBtn}>
-      <Feather name="menu" size={22} color={colors.icon} />
-    </Pressable>
-  );
-}
-
-function ProfileButton() {
-  const { profile } = useProfile();
-  return (
-    <Pressable
-      onPress={() => router.push('/profile')}
-      hitSlop={10}
-      style={styles.profileBtn}
+    <SafeAreaView
+      style={[styles.root, { backgroundColor: colors.background }]}
+      edges={['top']}
     >
-      <ProfileAvatar
-        name={profile.name}
-        color={profile.avatarColor}
-        size={30}
-      />
-    </Pressable>
-  );
-}
-
-// Full-area message used for loading / permission / error states.
-function CenterState({
-  icon,
-  busy,
-  title,
-  subtitle,
-  actionLabel,
-  onAction,
-  colors,
-  design,
-}: {
-  icon?: React.ComponentProps<typeof Feather>['name'];
-  busy?: boolean;
-  title: string;
-  subtitle?: string;
-  actionLabel?: string;
-  onAction?: () => void;
-  colors: any;
-  design: any;
-}) {
-  return (
-    <View style={styles.center}>
-      {busy ? (
-        <>
-          <ActivityIndicator color={colors.primary} />
-          <Text
-            style={[
-              design.type.caption,
-              { color: colors.textSecondary, marginTop: 8 },
-            ]}
-          >
-            {title}
-          </Text>
-        </>
-      ) : (
-        <>
-          {icon ? (
-            <Feather name={icon} size={42} color={colors.iconMuted} />
-          ) : null}
-          <Text
-            style={[
-              design.type.heading,
-              { color: colors.text, marginTop: icon ? 8 : 0 },
-            ]}
-          >
-            {title}
-          </Text>
-          {subtitle ? (
-            <Text
-              style={[
-                design.type.caption,
-                {
-                  color: colors.textSecondary,
-                  marginTop: 4,
-                  textAlign: 'center',
-                },
-              ]}
-            >
-              {subtitle}
-            </Text>
-          ) : null}
-          {actionLabel && onAction ? (
-            <Pressable
-              style={[
-                styles.primaryBtn,
-                {
-                  backgroundColor: colors.primary,
-                  borderRadius: design.radius.pill,
-                },
-              ]}
-              onPress={onAction}
-            >
-              <Text
-                style={[
-                  design.type.caption,
-                  { color: colors.primaryText, fontWeight: '700' },
-                ]}
-              >
-                {actionLabel}
-              </Text>
-            </Pressable>
-          ) : null}
-        </>
-      )}
-    </View>
-  );
-}
-
-export default function LibraryScreen() {
-  const { songs, loading, enriching, granted, error, refresh } = useLibrary();
-  const { playQueue, currentTrack } = usePlayer();
-  const { colors, design } = useTheme();
-  const navigation = useNavigation();
-
-  const [source, setSource] = useState<Source>('device');
-  const isCircle = source === 'circle';
-  // Only fetches once the Circle source is first opened
-  const circle = useCircleTracks(isCircle);
-
-  const [query, setQuery] = useState('');
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [sort, setSort] = useState<SortMode>('title');
-  const [actionSong, setActionSong] = useState<Song | null>(null);
-  const inputRef = useRef<TextInput>(null);
-
-  const openSearch = useCallback(() => setSearchOpen(true), []);
-  const closeSearch = useCallback(() => {
-    setSearchOpen(false);
-    setQuery('');
-  }, []);
-
-  useLayoutEffect(() => {
-    if (searchOpen) {
-      navigation.setOptions({
-        headerShown: true,
-        headerStyle: { backgroundColor: colors.headerBg },
-        headerShadowVisible: false,
-        headerTitle: () => (
-          <TextInput
-            ref={inputRef}
-            autoFocus
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search songs, artists, albums"
-            placeholderTextColor={colors.textMuted}
-            style={[styles.headerSearchInput, { color: colors.text }]}
-            returnKeyType="search"
-            autoCorrect={false}
-            autoCapitalize="none"
-          />
-        ),
-        headerLeft: () => (
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── Header: hamburger + greeting actions ─────── */}
+        <View style={styles.header}>
           <Pressable
-            onPress={closeSearch}
+            onPress={openDrawer}
             hitSlop={10}
-            style={styles.headerBtn}
+            style={[
+              styles.headerIconBtn,
+              { backgroundColor: colors.chipBg },
+            ]}
           >
-            <Feather name="arrow-left" size={22} color={colors.icon} />
+            <Feather name="menu" size={22} color={colors.icon} />
           </Pressable>
-        ),
-        headerRight: () =>
-          query.length > 0 ? (
+
+          <View style={styles.headerActions}>
             <Pressable
-              onPress={() => setQuery('')}
-              hitSlop={10}
-              style={styles.headerBtn}
-            >
-              <Feather name="x-circle" size={20} color={colors.iconMuted} />
-            </Pressable>
-          ) : null,
-      });
-    } else {
-      navigation.setOptions({
-        headerShown: true,
-        headerStyle: { backgroundColor: colors.headerBg },
-        headerShadowVisible: false,
-        headerTitle: 'Library',
-        headerTitleStyle: { color: colors.text, fontWeight: '700' },
-        headerLeft: () => <MenuButton />,
-        headerRight: () => (
-          <View style={styles.headerRightGroup}>
-            <Pressable
-              onPress={openSearch}
-              hitSlop={10}
-              style={styles.headerBtn}
+              onPress={() => router.push('/library')}
+              style={[
+                styles.headerIconBtn,
+                { backgroundColor: colors.chipBg },
+              ]}
+              hitSlop={6}
             >
               <Feather name="search" size={20} color={colors.icon} />
             </Pressable>
-            <ProfileButton />
-          </View>
-        ),
-      });
-    }
-  }, [navigation, searchOpen, query, openSearch, closeSearch, colors]);
-
-  const baseSongs = isCircle ? circle.songs : songs;
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    let list = baseSongs;
-    if (q) {
-      list = list.filter(
-        (s) =>
-          s.title.toLowerCase().includes(q) ||
-          s.artist.toLowerCase().includes(q) ||
-          s.album.toLowerCase().includes(q)
-      );
-    }
-    const sorted = [...list];
-    sorted.sort((a, b) => {
-      if (sort === 'artist') {
-        const byArtist = (a.artist || '').localeCompare(b.artist || '');
-        if (byArtist !== 0) return byArtist;
-        return (a.album || '').localeCompare(b.album || '');
-      }
-      if (sort === 'album') {
-        const byAlbum = (a.album || '').localeCompare(b.album || '');
-        if (byAlbum !== 0) return byAlbum;
-        return (a.trackNumber ?? 0) - (b.trackNumber ?? 0);
-      }
-      return (a.title || '').localeCompare(b.title || '');
-    });
-    return sorted;
-  }, [baseSongs, query, sort]);
-
-  // ── Loading / permission / error states ──────────────────
-  // These replace the list but NOT the source switch, so you can
-  // always flip between Device and Circle.
-  let stateView: React.ReactNode = null;
-
-  if (!isCircle) {
-    if (loading) {
-      stateView = (
-        <CenterState
-          busy
-          title="Loading your library…"
-          colors={colors}
-          design={design}
-        />
-      );
-    } else if (!granted) {
-      stateView = (
-        <CenterState
-          icon="music"
-          title="No access to your music"
-          subtitle="Grant permission to see songs on this device."
-          actionLabel="Grant permission"
-          onAction={refresh}
-          colors={colors}
-          design={design}
-        />
-      );
-    } else if (error) {
-      stateView = (
-        <CenterState
-          title="Something went wrong"
-          subtitle={error}
-          actionLabel="Try again"
-          onAction={refresh}
-          colors={colors}
-          design={design}
-        />
-      );
-    }
-  } else {
-    if (circle.loading && circle.songs.length === 0) {
-      stateView = (
-        <CenterState
-          busy
-          title="Loading from Circle…"
-          colors={colors}
-          design={design}
-        />
-      );
-    } else if (circle.error && circle.songs.length === 0) {
-      stateView = (
-        <CenterState
-          icon="wifi-off"
-          title="Couldn't load Circle tracks"
-          subtitle={circle.error}
-          actionLabel="Try again"
-          onAction={circle.refresh}
-          colors={colors}
-          design={design}
-        />
-      );
-    }
-  }
-
-  return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
-      {/* Source switch */}
-      <View style={styles.sourceRow}>
-        {(['device', 'circle'] as Source[]).map((s) => {
-          const active = source === s;
-          return (
             <Pressable
-              key={s}
-              onPress={() => setSource(s)}
+              onPress={() => router.push('/favorites')}
               style={[
-                styles.sortBtn,
-                {
-                  backgroundColor: colors.chipBg,
-                  borderRadius: design.radius.pill,
-                },
-                active && { backgroundColor: colors.chipBgActive },
+                styles.headerIconBtn,
+                { backgroundColor: colors.chipBg },
+              ]}
+              hitSlop={6}
+            >
+              <Feather name="heart" size={20} color={colors.icon} />
+            </Pressable>
+          </View>
+        </View>
+
+        <Text style={[styles.greeting, { color: colors.text }]}>
+          Hi, <Text style={styles.greetingName}>{firstName}</Text>
+        </Text>
+
+        {/* ── Categories ─────────────────────────────────── */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoriesRow}
+        >
+          {CATEGORIES.map((c) => {
+            const active = category === c.key;
+            return (
+              <Pressable
+                key={c.key}
+                onPress={() => setCategory(c.key)}
+                style={[
+                  styles.categoryChip,
+                  { backgroundColor: colors.chipBg },
+                  active && { backgroundColor: colors.primary },
+                ]}
+              >
+                <Text
+                  style={[
+                    design.type.caption,
+                    {
+                      color: colors.chipText,
+                      fontWeight: '700',
+                      fontSize: 14,
+                    },
+                    active && { color: colors.primaryText },
+                  ]}
+                >
+                  {c.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        {/* ── Curated & trending ────────────────────────── */}
+        <Text
+          style={[
+            styles.sectionTitle,
+            { color: colors.text, marginTop: 28 },
+          ]}
+        >
+          Curated & trending
+        </Text>
+
+        <FeaturedCard
+          title={featured.title}
+          subtitle={featured.subtitle}
+          artwork={featured.artwork}
+          colors={colors}
+          design={design}
+          onPlay={handleFeaturedPlay}
+        />
+
+        {/* ── Top daily playlists ───────────────────────── */}
+        <View style={[styles.sectionHeader, { marginTop: 28 }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            Top daily playlists
+          </Text>
+          <Pressable onPress={() => router.push('/playlists')} hitSlop={8}>
+            <Text
+              style={[
+                design.type.caption,
+                { color: colors.textSecondary, fontWeight: '600' },
               ]}
             >
+              See all
+            </Text>
+          </Pressable>
+        </View>
+
+        <View style={{ marginTop: 12 }}>
+          {playlists.length === 0 ? (
+            <View
+              style={[
+                styles.emptyPlaylists,
+                {
+                  backgroundColor: colors.surface,
+                  borderRadius: design.radius.card,
+                },
+              ]}
+            >
+              <Feather name="list" size={28} color={colors.iconMuted} />
+              <Text
+                style={[
+                  design.type.body,
+                  { color: colors.text, marginTop: 10, fontWeight: '600' },
+                ]}
+              >
+                No playlists yet
+              </Text>
               <Text
                 style={[
                   design.type.caption,
-                  { color: colors.chipText, fontWeight: '600' },
-                  active && {
-                    color: colors.chipTextActive,
-                    fontWeight: '700',
-                  },
-                ]}
-              >
-                {s === 'device' ? 'Device' : 'Circle'}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      {stateView ?? (
-        <>
-          <View style={styles.sortRow}>
-            {(['title', 'artist', 'album'] as SortMode[]).map((mode) => {
-              const active = sort === mode;
-              return (
-                <Pressable
-                  key={mode}
-                  onPress={() => setSort(mode)}
-                  style={[
-                    styles.sortBtn,
-                    {
-                      backgroundColor: colors.chipBg,
-                      borderRadius: design.radius.pill,
-                    },
-                    active && { backgroundColor: colors.chipBgActive },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      design.type.caption,
-                      { color: colors.chipText, fontWeight: '600' },
-                      active && {
-                        color: colors.chipTextActive,
-                        fontWeight: '700',
-                      },
-                    ]}
-                  >
-                    {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                  </Text>
-                </Pressable>
-              );
-            })}
-            {!isCircle && enriching && (
-              <View
-                style={[
-                  styles.enrichingChip,
                   {
-                    backgroundColor: colors.rowActive,
-                    borderRadius: design.radius.pill,
+                    color: colors.textSecondary,
+                    marginTop: 4,
+                    textAlign: 'center',
                   },
                 ]}
               >
-                <ActivityIndicator size="small" color={colors.primary} />
-                <Text
-                  style={[
-                    design.type.caption,
-                    { color: colors.primary, fontWeight: '700' },
-                  ]}
-                >
-                  Reading tags
-                </Text>
-              </View>
-            )}
-          </View>
-
-          <FlatList
-            data={filtered}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={{ paddingBottom: 200 }}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"
-            initialNumToRender={20}
-            windowSize={10}
-            removeClippedSubviews
-            // Pull down to re-fetch the Circle list (device list has no pull-to-refresh)
-            refreshing={isCircle && circle.loading}
-            onRefresh={isCircle ? circle.refresh : undefined}
-            renderItem={({ item, index }) => (
-              <SongRow
-                song={item}
-                isActive={currentTrack?.id === item.id}
-                onPress={() => playQueue(filtered, index)}
-                // The action sheet works on files on this device, so it is
-                // not offered for Circle tracks.
-                onLongPress={
-                  isCircleSong(item) ? undefined : () => setActionSong(item)
-                }
+                Create one to see it here.
+              </Text>
+            </View>
+          ) : (
+            playlists.slice(0, 5).map((p: any) => (
+              <PlaylistRow
+                key={p.id}
+                playlist={p}
                 colors={colors}
                 design={design}
+                onPress={() => router.push(`/playlist/${p.id}`)}
+                onPlay={() => {
+                  if (p.songs?.length) playQueue(p.songs, 0);
+                }}
               />
-            )}
-            ListEmptyComponent={
-              <View style={styles.center}>
-                <Feather name="music" size={42} color={colors.iconMuted} />
-                <Text
-                  style={[
-                    design.type.heading,
-                    { color: colors.text, marginTop: 8 },
-                  ]}
-                >
-                  {query
-                    ? 'No matches'
-                    : isCircle
-                    ? 'No Circle tracks yet'
-                    : 'No songs found'}
-                </Text>
-                <Text
-                  style={[
-                    design.type.caption,
-                    {
-                      color: colors.textSecondary,
-                      marginTop: 4,
-                      textAlign: 'center',
-                    },
-                  ]}
-                >
-                  {query
-                    ? 'Try a different search.'
-                    : isCircle
-                    ? 'Upload a track to your Circle server, then pull down to refresh.'
-                    : 'Add audio files to this device to see them here.'}
-                </Text>
-              </View>
-            }
-          />
-        </>
-      )}
+            ))
+          )}
+        </View>
+      </ScrollView>
 
       <MiniPlayer bottomOffset={0} />
+    </SafeAreaView>
+  );
+}
 
-      <SongActionSheet
-        visible={!!actionSong}
-        song={actionSong}
-        onClose={() => setActionSong(null)}
-      />
+// ── Featured card ────────────────────────────────────────
+function FeaturedCard({
+  title,
+  subtitle,
+  artwork,
+  colors,
+  design,
+  onPlay,
+}: {
+  title: string;
+  subtitle: string;
+  artwork?: string;
+  colors: any;
+  design: any;
+  onPlay: () => void;
+}) {
+  return (
+    <View
+      style={[
+        styles.featuredCard,
+        {
+          backgroundColor: colors.rowActive,
+          borderRadius: design.radius.card + 6,
+        },
+      ]}
+    >
+      <View style={styles.featuredLeft}>
+        <Text
+          style={[
+            design.type.title,
+            { color: colors.text, fontWeight: '800', fontSize: 22 },
+          ]}
+          numberOfLines={2}
+        >
+          {title}
+        </Text>
+        <Text
+          style={[
+            design.type.caption,
+            {
+              color: colors.textSecondary,
+              marginTop: 8,
+              lineHeight: 19,
+            },
+          ]}
+          numberOfLines={3}
+        >
+          {subtitle}
+        </Text>
+
+        <View style={styles.featuredActions}>
+          <Pressable
+            onPress={onPlay}
+            style={[
+              styles.featuredPlayBtn,
+              { backgroundColor: colors.primary },
+            ]}
+            hitSlop={6}
+          >
+            <Feather
+              name="play"
+              size={20}
+              color={colors.primaryText}
+              style={{ marginLeft: 2 }}
+            />
+          </Pressable>
+          <Pressable hitSlop={8} style={styles.featuredIcon}>
+            <Feather name="heart" size={20} color={colors.text} />
+          </Pressable>
+          <Pressable hitSlop={8} style={styles.featuredIcon}>
+            <Feather name="download" size={20} color={colors.text} />
+          </Pressable>
+          <Pressable hitSlop={8} style={styles.featuredIcon}>
+            <Feather name="more-horizontal" size={20} color={colors.text} />
+          </Pressable>
+        </View>
+      </View>
+
+      {artwork ? (
+        <Image
+          source={{ uri: artwork }}
+          style={[
+            styles.featuredArt,
+            {
+              borderTopRightRadius: design.radius.card + 6,
+              borderBottomRightRadius: design.radius.card + 6,
+            },
+          ]}
+        />
+      ) : (
+        <View
+          style={[
+            styles.featuredArt,
+            {
+              backgroundColor: colors.artPlaceholder,
+              borderTopRightRadius: design.radius.card + 6,
+              borderBottomRightRadius: design.radius.card + 6,
+            },
+          ]}
+        />
+      )}
     </View>
   );
 }
 
-const SongRow = React.memo(function SongRow({
-  song,
-  isActive,
-  onPress,
-  onLongPress,
+// ── Playlist row ─────────────────────────────────────────
+function PlaylistRow({
+  playlist,
   colors,
   design,
+  onPress,
+  onPlay,
 }: {
-  song: Song;
-  isActive: boolean;
-  onPress: () => void;
-  onLongPress?: () => void;
+  playlist: any;
   colors: any;
   design: any;
+  onPress: () => void;
+  onPlay: () => void;
 }) {
+  const cover =
+    playlist.coverUri ?? playlist.songs?.[0]?.artwork ?? undefined;
+  const songCount = playlist.songs?.length ?? 0;
+
   return (
     <Pressable
       onPress={onPress}
-      onLongPress={onLongPress}
-      delayLongPress={400}
       style={({ pressed }) => [
-        styles.row,
-        {
-          paddingVertical: design.row.paddingVertical,
-          borderBottomWidth: design.row.borderBottomWidth,
-          borderBottomColor: design.row.borderBottomColor,
-        },
-        isActive && { backgroundColor: colors.rowActive },
+        styles.playlistRow,
         pressed && { opacity: 0.7 },
       ]}
     >
-      {song.artwork ? (
+      {cover ? (
         <Image
-          source={{ uri: song.artwork }}
+          source={{ uri: cover }}
           style={[
-            styles.artImage,
+            styles.playlistArt,
             {
               borderRadius: design.radius.item,
               backgroundColor: colors.artPlaceholder,
@@ -551,19 +389,14 @@ const SongRow = React.memo(function SongRow({
       ) : (
         <View
           style={[
-            styles.artPlaceholder,
+            styles.playlistArt,
             {
               borderRadius: design.radius.item,
               backgroundColor: colors.artPlaceholder,
             },
-            isActive && { backgroundColor: colors.primary },
           ]}
         >
-          <Feather
-            name="music"
-            size={18}
-            color={isActive ? colors.primaryText : colors.iconMuted}
-          />
+          <Feather name="music" size={20} color={colors.iconMuted} />
         </View>
       )}
 
@@ -572,11 +405,10 @@ const SongRow = React.memo(function SongRow({
           numberOfLines={1}
           style={[
             design.type.body,
-            { color: colors.text, fontWeight: '600' },
-            isActive && { color: colors.primary },
+            { color: colors.text, fontWeight: '700' },
           ]}
         >
-          {song.title}
+          {playlist.name}
         </Text>
         <Text
           numberOfLines={1}
@@ -585,89 +417,145 @@ const SongRow = React.memo(function SongRow({
             { color: colors.textSecondary, marginTop: 2 },
           ]}
         >
-          {song.artist}
-          {song.album && song.album !== 'Unknown Album'
-            ? ` · ${song.album}`
-            : ''}
+          {playlist.artist ? `By ${playlist.artist} · ` : ''}
+          {songCount} {songCount === 1 ? 'Song' : 'Songs'}
         </Text>
       </View>
 
-      {isActive && (
-        <Feather name="volume-2" size={16} color={colors.primary} />
-      )}
-
-      <LikeButton uri={likeKey(song)} size={18} />
+      <Pressable
+        onPress={onPlay}
+        hitSlop={10}
+        style={[
+          styles.playlistPlayBtn,
+          { backgroundColor: colors.chipBg },
+        ]}
+      >
+        <Feather name="play" size={16} color={colors.icon} />
+      </Pressable>
     </Pressable>
   );
-});
+}
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  center: {
-    flex: 1,
+  scrollContent: { paddingTop: 8, paddingBottom: 200 },
+
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 4,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  headerIconBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
-    gap: 4,
   },
-  primaryBtn: {
+
+  greeting: {
+    fontSize: 34,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    paddingHorizontal: 20,
+    marginTop: 20,
+  },
+  greetingName: {
+    fontWeight: '400',
+  },
+
+  categoriesRow: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    gap: 8,
+  },
+  categoryChip: {
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 999,
+  },
+
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    paddingHorizontal: 20,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingRight: 20,
+  },
+
+  // ── Featured card ────────────────────────────────────
+  featuredCard: {
+    flexDirection: 'row',
+    marginHorizontal: 20,
     marginTop: 14,
-    paddingHorizontal: 20,
-    paddingVertical: 11,
+    minHeight: 170,
+    overflow: 'hidden',
   },
-  headerBtn: { paddingHorizontal: 12, paddingVertical: 8 },
-  profileBtn: { paddingHorizontal: 8, paddingVertical: 6 },
-  headerRightGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerSearchInput: {
+  featuredLeft: {
     flex: 1,
-    fontSize: 16,
-    paddingVertical: Platform.OS === 'ios' ? 8 : 4,
-    minWidth: 200,
+    padding: 20,
+    justifyContent: 'space-between',
   },
-  sourceRow: {
+  featuredActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingTop: 12,
+    gap: 18,
+    marginTop: 16,
   },
-  sortRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 8,
-  },
-  sortBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-  },
-  enrichingChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginLeft: 'auto',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 20,
-  },
-  artPlaceholder: {
-    width: 44,
-    height: 44,
+  featuredPlayBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  artImage: {
-    width: 44,
-    height: 44,
+  featuredIcon: {
+    padding: 4,
+  },
+  featuredArt: {
+    width: 150,
+    height: '100%',
+    minHeight: 170,
+  },
+
+  // ── Playlist rows ────────────────────────────────────
+  playlistRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  playlistArt: {
+    width: 60,
+    height: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playlistPlayBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  emptyPlaylists: {
+    marginHorizontal: 20,
+    padding: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

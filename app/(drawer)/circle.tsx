@@ -12,6 +12,7 @@ import { Feather } from '@expo/vector-icons';
 import { useCircleTracks } from '../../hooks/useCircleTracks';
 import { usePlayer } from '../../context/PlayerContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useHeaderBack } from '../../hooks/useHeaderBack';
 import { likeKey } from '../../lib/circle';
 import MiniPlayer from '../../components/MiniPlayer';
 import LikeButton from '../../components/LikeButton';
@@ -22,6 +23,8 @@ export default function CircleScreen() {
   const { playQueue, currentTrack } = usePlayer();
   const { colors, design } = useTheme();
   const [actionSong, setActionSong] = useState<any>(null);
+
+  useHeaderBack('Circle');
 
   if (loading) {
     return (

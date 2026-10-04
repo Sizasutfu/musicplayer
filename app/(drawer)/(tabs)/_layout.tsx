@@ -30,9 +30,7 @@ export default function TabsLayout() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
-  // Base height for the icons + labels
   const BASE_HEIGHT = Platform.OS === 'ios' ? 50 : 56;
-  // Add the OS bottom inset (gesture pill or 3-button nav bar)
   const totalHeight = BASE_HEIGHT + insets.bottom;
 
   return (
@@ -64,10 +62,25 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Library',
+          title: 'Home',
+          headerShown: false,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'home' : 'home-outline'}
+              size={24}
+              color={color}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="library"
+        options={{
+          title: 'Library',
+          headerShown: false,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? 'musical-notes' : 'musical-notes-outline'}
               size={24}
               color={color}
             />
@@ -88,19 +101,6 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="favorites"
-        options={{
-          title: 'Favorites',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? 'heart' : 'heart-outline'}
-              size={26}
-              color={color}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="settings"
         options={{
           title: 'Settings',
@@ -111,6 +111,15 @@ export default function TabsLayout() {
               color={color}
             />
           ),
+        }}
+      />
+      {/* Route exists but is hidden from the tab bar. Reachable via
+          router.push('/favorites') from the home screen heart button. */}
+      <Tabs.Screen
+        name="favorites"
+        options={{
+          href: null,
+          headerShown: false,
         }}
       />
     </Tabs>
