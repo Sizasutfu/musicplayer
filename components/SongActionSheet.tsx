@@ -7,14 +7,21 @@ import {
   Pressable,
   StyleSheet,
   Alert,
+  useWindowDimensions,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useFavorites } from '../hooks/useFavorites';
 import { usePlayer } from '../context/PlayerContext';
+import { useHover } from '../hooks/useHover';
 import type { Song } from '../hooks/useLibrary';
 import AddToPlaylistSheet from './AddToPlaylistSheet';
+
+// On wide viewports the sheet caps at this width and centers.
+// Full-width on phones.
+const SHEET_MAX_WIDTH = 480;
 
 type ExtraAction = {
   icon: React.ComponentProps<typeof Feather>['name'];
@@ -40,6 +47,10 @@ export default function SongActionSheet({
   const { favorites, toggle } = useFavorites();
   const { playNext, addToQueue } = usePlayer();
   const [playlistOpen, setPlaylistOpen] = useState(false);
+
+  const { width } = useWindowDimensions();
+  const sheetWidth = Math.min(width, SHEET_MAX_WIDTH);
+  const centerLeft = (width - sheetWidth) / 2;
 
   const close = () => {
     setPlaylistOpen(false);
@@ -86,7 +97,15 @@ export default function SongActionSheet({
           <Pressable style={styles.backdrop} onPress={close} />
 
           <SafeAreaView
-            style={[styles.sheet, { backgroundColor: colors.surface }]}
+            style={[
+              styles.sheet,
+              {
+                backgroundColor: colors.surface,
+                width: sheetWidth,
+                left: centerLeft,
+                borderRadius: 20,
+              },
+            ]}
             edges={['bottom']}
           >
             <View style={styles.handleWrap}>
@@ -177,19 +196,11 @@ export default function SongActionSheet({
               />
             ))}
 
-            <Pressable
+            <CancelRow
               onPress={close}
-              style={[styles.cancel, { borderTopColor: colors.border }]}
-            >
-              <Text
-                style={[
-                  design.type.body,
-                  { color: colors.textSecondary, fontWeight: '600' },
-                ]}
-              >
-                Cancel
-              </Text>
-            </Pressable>
+              colors={colors}
+              design={design}
+            />
           </SafeAreaView>
         </View>
       </Modal>
@@ -203,6 +214,7 @@ export default function SongActionSheet({
   );
 }
 
+// ── Action row ──────────────────────────────────────────
 function ActionRow({
   icon,
   label,
@@ -222,22 +234,21 @@ function ActionRow({
   iconFilled?: boolean;
   last?: boolean;
 }) {
-  const iconColor = destructive
-    ? colors.danger
-    : iconFilled
-    ? colors.primary
-    : colors.primary;
+  const { hovered, hoverProps } = useHover();
+
+  const iconColor = destructive ? colors.danger : colors.primary;
 
   return (
     <Pressable
+      {...hoverProps}
       onPress={onPress}
-      style={({ pressed }) => [
+      style={[
         styles.row,
         !last && {
           borderBottomColor: colors.borderSubtle,
           borderBottomWidth: StyleSheet.hairlineWidth,
         },
-        pressed && { backgroundColor: colors.surfaceElevated },
+        hovered && { backgroundColor: colors.surfaceElevated },
       ]}
     >
       <View
@@ -272,6 +283,40 @@ function ActionRow({
   );
 }
 
+// ── Cancel row ──────────────────────────────────────────
+function CancelRow({
+  onPress,
+  colors,
+  design,
+}: {
+  onPress: () => void;
+  colors: any;
+  design: any;
+}) {
+  const { hovered, hoverProps } = useHover();
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      style={[
+        styles.cancel,
+        { borderTopColor: colors.border },
+        hovered && { backgroundColor: colors.surfaceElevated },
+      ]}
+    >
+      <Text
+        style={[
+          design.type.body,
+          { color: colors.textSecondary, fontWeight: '600' },
+        ]}
+      >
+        Cancel
+      </Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end' },
   backdrop: {
@@ -283,8 +328,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   sheet: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    overflow: 'hidden',
     paddingBottom: 8,
   },
   handleWrap: { alignItems: 'center', paddingTop: 10, paddingBottom: 6 },
