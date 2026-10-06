@@ -1,5 +1,5 @@
 // app/(drawer)/profile.tsx
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,8 @@ import {
   KeyboardAvoidingView,
   ActivityIndicator,
   Linking,
+  Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -22,6 +24,7 @@ import { usePlaylists } from '../../hooks/usePlaylists';
 import { useLibrary } from '../../hooks/useLibrary';
 import { useTheme } from '../../context/ThemeContext';
 import { useHeaderBack } from '../../hooks/useHeaderBack';
+import { useHover } from '../../hooks/useHover';
 import {
   AVATAR_COLORS,
   deleteAvatarFile,
@@ -36,11 +39,38 @@ type IconName = React.ComponentProps<typeof Feather>['name'];
 
 type EditField = 'name' | 'username' | 'bio' | null;
 
+// Profile is a form with a large avatar header and short sections.
+// Cap at 720 like Settings — narrower than the list screens so
+// rows don't stretch across a wide browser.
+const CONTENT_MAX_WIDTH = 720;
+
+// ── Responsive sizing ──────────────────────────────────
+type Layout = {
+  hPad: number;          // horizontal gutter for cards
+  avatarSize: number;
+  sectionPad: number;    // inner card padding
+  rowVPad: number;
+};
+
+function layoutFor(width: number): Layout {
+  if (width < 500) {
+    return { hPad: 16, avatarSize: 96, sectionPad: 24, rowVPad: 14 };
+  }
+  if (width < 900) {
+    return { hPad: 24, avatarSize: 112, sectionPad: 28, rowVPad: 14 };
+  }
+  return { hPad: 32, avatarSize: 128, sectionPad: 32, rowVPad: 16 };
+}
+
 export default function ProfileScreen() {
   const { profile, loaded, update, reset } = useProfile();
   const { playlists } = usePlaylists();
   const { songs } = useLibrary();
   const { colors, design } = useTheme();
+
+  const { width } = useWindowDimensions();
+  const isWide = width >= 900;
+  const L = useMemo(() => layoutFor(width), [width]);
 
   const [editField, setEditField] = useState<EditField>(null);
   const [draft, setDraft] = useState('');
@@ -165,200 +195,199 @@ export default function ProfileScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View
-          style={[
-            design.card,
-            styles.headerCard,
-            { backgroundColor: colors.surface },
-          ]}
+          style={{
+            width: '100%',
+            maxWidth: isWide ? CONTENT_MAX_WIDTH : width,
+            alignSelf: 'center',
+          }}
         >
-          <Pressable onPress={openAvatarMenu} hitSlop={8}>
-            <View>
-              <ProfileAvatar
-                name={profile.name}
-                color={profile.avatarColor}
-                uri={profile.avatarUri}
-                size={96}
-                fontSize={38}
-              />
-              <View
+          {/* ── Header card ───────────────────────────── */}
+          <View
+            style={[
+              design.card,
+              {
+                backgroundColor: colors.surface,
+                marginHorizontal: L.hPad,
+                padding: L.sectionPad,
+                alignItems: 'center',
+              },
+            ]}
+          >
+            <AvatarPressable
+              onPress={openAvatarMenu}
+              profile={profile}
+              size={L.avatarSize}
+              colors={colors}
+            />
+
+            <Text
+              style={[
+                design.type.title,
+                { color: colors.text, marginTop: 16, textAlign: 'center' },
+              ]}
+            >
+              {profile.name}
+            </Text>
+            <Text
+              style={[
+                design.type.caption,
+                { color: colors.textSecondary, marginTop: 2 },
+              ]}
+            >
+              @{profile.username}
+            </Text>
+            {profile.bio ? (
+              <Text
                 style={[
-                  styles.cameraBadge,
+                  design.type.caption,
                   {
-                    backgroundColor: colors.primary,
-                    borderColor: colors.surface,
+                    color: colors.textMuted,
+                    marginTop: 10,
+                    textAlign: 'center',
+                    paddingHorizontal: 16,
+                    lineHeight: 19,
                   },
                 ]}
               >
-                <Feather name="camera" size={14} color={colors.primaryText} />
-              </View>
-            </View>
-          </Pressable>
+                {profile.bio}
+              </Text>
+            ) : null}
 
-          <Text
-            style={[
-              design.type.title,
-              { color: colors.text, marginTop: 16, textAlign: 'center' },
-            ]}
+            <EditProfileButton
+              onPress={() => openEdit('name')}
+              colors={colors}
+              design={design}
+            />
+          </View>
+
+          <Section
+            title="Avatar color"
+            hPad={L.hPad}
+            colors={colors}
+            design={design}
           >
-            {profile.name}
-          </Text>
+            <View style={styles.colorRow}>
+              {AVATAR_COLORS.map((c) => (
+                <ColorDot
+                  key={c}
+                  color={c}
+                  active={profile.avatarColor === c}
+                  onPress={() => update('avatarColor', c)}
+                  colors={colors}
+                />
+              ))}
+            </View>
+          </Section>
+
+          <Section
+            title="Your library"
+            hPad={L.hPad}
+            colors={colors}
+            design={design}
+          >
+            <View style={styles.statsRow}>
+              <Stat
+                icon="music"
+                value={totalTracks}
+                label={totalTracks === 1 ? 'Track' : 'Tracks'}
+                colors={colors}
+                design={design}
+              />
+              <View
+                style={[
+                  styles.statDivider,
+                  { backgroundColor: colors.border },
+                ]}
+              />
+              <Stat
+                icon="list"
+                value={totalPlaylists}
+                label={totalPlaylists === 1 ? 'Playlist' : 'Playlists'}
+                colors={colors}
+                design={design}
+              />
+            </View>
+          </Section>
+
+          <Section
+            title="Account"
+            hPad={L.hPad}
+            colors={colors}
+            design={design}
+          >
+            <FieldRow
+              icon="user"
+              label="Display name"
+              value={profile.name}
+              onPress={() => openEdit('name')}
+              rowVPad={L.rowVPad}
+              colors={colors}
+              design={design}
+            />
+            <FieldRow
+              icon="at-sign"
+              label="Username"
+              value={`@${profile.username}`}
+              onPress={() => openEdit('username')}
+              rowVPad={L.rowVPad}
+              colors={colors}
+              design={design}
+            />
+            <FieldRow
+              icon="align-left"
+              label="Bio"
+              value={profile.bio || 'Add a short bio'}
+              onPress={() => openEdit('bio')}
+              rowVPad={L.rowVPad}
+              colors={colors}
+              design={design}
+              last
+            />
+          </Section>
+
+          <Section
+            title="More"
+            hPad={L.hPad}
+            colors={colors}
+            design={design}
+          >
+            <ActionRow
+              icon="settings"
+              label="Settings"
+              onPress={() => router.push('/settings')}
+              rowVPad={L.rowVPad}
+              colors={colors}
+              design={design}
+            />
+            <ActionRow
+              icon="rotate-ccw"
+              label="Reset profile"
+              destructive
+              onPress={confirmReset}
+              rowVPad={L.rowVPad}
+              colors={colors}
+              design={design}
+              last
+            />
+          </Section>
+
           <Text
             style={[
               design.type.caption,
-              { color: colors.textSecondary, marginTop: 2 },
-            ]}
-          >
-            @{profile.username}
-          </Text>
-          {profile.bio ? (
-            <Text
-              style={[
-                design.type.caption,
-                {
-                  color: colors.textMuted,
-                  marginTop: 10,
-                  textAlign: 'center',
-                  paddingHorizontal: 16,
-                  lineHeight: 19,
-                },
-              ]}
-            >
-              {profile.bio}
-            </Text>
-          ) : null}
-
-          <Pressable
-            onPress={() => openEdit('name')}
-            style={({ pressed }) => [
-              styles.editBtn,
               {
-                backgroundColor: colors.primary,
-                borderRadius: design.radius.pill,
+                color: colors.textMuted,
+                textAlign: 'center',
+                marginTop: 32,
               },
-              pressed && { opacity: 0.9 },
             ]}
           >
-            <Feather name="edit-2" size={14} color={colors.primaryText} />
-            <Text
-              style={[
-                design.type.caption,
-                { color: colors.primaryText, fontWeight: '700' },
-              ]}
-            >
-              Edit profile
-            </Text>
-          </Pressable>
-        </View>
-
-        <Section title="Avatar color" colors={colors} design={design}>
-          <View style={styles.colorRow}>
-            {AVATAR_COLORS.map((c) => {
-              const active = profile.avatarColor === c;
-              return (
-                <Pressable
-                  key={c}
-                  onPress={() => update('avatarColor', c)}
-                  style={[
-                    styles.colorDot,
-                    { backgroundColor: c },
-                    active && {
-                      borderColor: colors.text,
-                      borderWidth: 3,
-                    },
-                  ]}
-                >
-                  {active && <Feather name="check" size={16} color="#fff" />}
-                </Pressable>
-              );
+            Joined{' '}
+            {new Date(profile.joinedAt).toLocaleDateString(undefined, {
+              month: 'long',
+              year: 'numeric',
             })}
-          </View>
-        </Section>
-
-        <Section title="Your library" colors={colors} design={design}>
-          <View style={styles.statsRow}>
-            <Stat
-              icon="music"
-              value={totalTracks}
-              label={totalTracks === 1 ? 'Track' : 'Tracks'}
-              colors={colors}
-              design={design}
-            />
-            <View
-              style={[styles.statDivider, { backgroundColor: colors.border }]}
-            />
-            <Stat
-              icon="list"
-              value={totalPlaylists}
-              label={totalPlaylists === 1 ? 'Playlist' : 'Playlists'}
-              colors={colors}
-              design={design}
-            />
-          </View>
-        </Section>
-
-        <Section title="Account" colors={colors} design={design}>
-          <FieldRow
-            icon="user"
-            label="Display name"
-            value={profile.name}
-            onPress={() => openEdit('name')}
-            colors={colors}
-            design={design}
-          />
-          <FieldRow
-            icon="at-sign"
-            label="Username"
-            value={`@${profile.username}`}
-            onPress={() => openEdit('username')}
-            colors={colors}
-            design={design}
-          />
-          <FieldRow
-            icon="align-left"
-            label="Bio"
-            value={profile.bio || 'Add a short bio'}
-            onPress={() => openEdit('bio')}
-            colors={colors}
-            design={design}
-            last
-          />
-        </Section>
-
-        <Section title="More" colors={colors} design={design}>
-          <ActionRow
-            icon="settings"
-            label="Settings"
-            onPress={() => router.push('/settings')}
-            colors={colors}
-            design={design}
-          />
-          <ActionRow
-            icon="rotate-ccw"
-            label="Reset profile"
-            destructive
-            onPress={confirmReset}
-            colors={colors}
-            design={design}
-            last
-          />
-        </Section>
-
-        <Text
-          style={[
-            design.type.caption,
-            {
-              color: colors.textMuted,
-              textAlign: 'center',
-              marginTop: 32,
-            },
-          ]}
-        >
-          Joined{' '}
-          {new Date(profile.joinedAt).toLocaleDateString(undefined, {
-            month: 'long',
-            year: 'numeric',
-          })}
-        </Text>
+          </Text>
+        </View>
       </ScrollView>
 
       <Modal
@@ -367,24 +396,12 @@ export default function ProfileScreen() {
         animationType="fade"
         onRequestClose={() => setEditField(null)}
       >
-        {/* `padding` on both platforms. Android's old `undefined`
-            behaviour meant the card sat still while the keyboard
-            covered the Save and Cancel buttons. iOS padding was
-            already correct; unifying the two keeps behaviour
-            predictable. */}
-        <KeyboardAvoidingView
-          style={styles.modalOverlay}
-          behavior="padding"
-        >
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior="padding">
           <Pressable
             style={styles.modalBackdrop}
             onPress={() => setEditField(null)}
           />
 
-          {/* ScrollView so the card can shift up when the keyboard
-              covers the lower half of the screen without squashing
-              the input. `keyboardShouldPersistTaps` keeps the Save
-              tap working while the keyboard is up. */}
           <ScrollView
             contentContainerStyle={styles.modalScrollContent}
             keyboardShouldPersistTaps="handled"
@@ -443,36 +460,20 @@ export default function ProfileScreen() {
               />
 
               <View style={styles.modalActions}>
-                <Pressable
+                <ModalButton
+                  label="Cancel"
+                  variant="secondary"
                   onPress={() => setEditField(null)}
-                  style={[
-                    styles.modalBtn,
-                    {
-                      backgroundColor: colors.chipBg,
-                      borderRadius: design.radius.item,
-                    },
-                  ]}
-                >
-                  <Text style={[design.type.body, { color: colors.text }]}>
-                    Cancel
-                  </Text>
-                </Pressable>
-                <Pressable
+                  colors={colors}
+                  design={design}
+                />
+                <ModalButton
+                  label="Save"
+                  variant="primary"
                   onPress={submitEdit}
-                  style={[
-                    styles.modalBtn,
-                    {
-                      backgroundColor: colors.primary,
-                      borderRadius: design.radius.item,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[design.type.body, { color: colors.primaryText }]}
-                  >
-                    Save
-                  </Text>
-                </Pressable>
+                  colors={colors}
+                  design={design}
+                />
               </View>
             </View>
           </ScrollView>
@@ -484,13 +485,185 @@ export default function ProfileScreen() {
   );
 }
 
+// ── Avatar pressable ────────────────────────────────────
+function AvatarPressable({
+  onPress,
+  profile,
+  size,
+  colors,
+}: {
+  onPress: () => void;
+  profile: any;
+  size: number;
+  colors: Colors;
+}) {
+  const { hovered, hoverProps } = useHover();
+  const isWeb = Platform.OS === 'web';
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      hitSlop={8}
+      style={[
+        hovered && isWeb && { opacity: 0.9 },
+      ]}
+    >
+      <View>
+        <ProfileAvatar
+          name={profile.name}
+          color={profile.avatarColor}
+          uri={profile.avatarUri}
+          size={size}
+          fontSize={Math.round(size * 0.4)}
+        />
+        <View
+          style={[
+            styles.cameraBadge,
+            {
+              backgroundColor: colors.primary,
+              borderColor: colors.surface,
+            },
+          ]}
+        >
+          <Feather
+            name="camera"
+            size={Math.round(size >= 112 ? 16 : 14)}
+            color={colors.primaryText}
+          />
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+// ── Edit profile button ─────────────────────────────────
+function EditProfileButton({
+  onPress,
+  colors,
+  design,
+}: {
+  onPress: () => void;
+  colors: Colors;
+  design: Design;
+}) {
+  const { hovered, hoverProps } = useHover();
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      style={[
+        styles.editBtn,
+        {
+          backgroundColor: colors.primary,
+          borderRadius: design.radius.pill,
+        },
+        hovered && { opacity: 0.9 },
+      ]}
+    >
+      <Feather name="edit-2" size={14} color={colors.primaryText} />
+      <Text
+        style={[
+          design.type.caption,
+          { color: colors.primaryText, fontWeight: '700' },
+        ]}
+      >
+        Edit profile
+      </Text>
+    </Pressable>
+  );
+}
+
+// ── Color dot ───────────────────────────────────────────
+function ColorDot({
+  color,
+  active,
+  onPress,
+  colors,
+}: {
+  color: string;
+  active: boolean;
+  onPress: () => void;
+  colors: Colors;
+}) {
+  const { hovered, hoverProps } = useHover();
+  const isWeb = Platform.OS === 'web';
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      style={[
+        styles.colorDot,
+        { backgroundColor: color },
+        active && {
+          borderColor: colors.text,
+          borderWidth: 3,
+        },
+        hovered && isWeb && !active && {
+          borderColor: colors.text,
+          borderWidth: 2,
+        },
+      ]}
+    >
+      {active && <Feather name="check" size={16} color="#fff" />}
+    </Pressable>
+  );
+}
+
+// ── Modal button ────────────────────────────────────────
+function ModalButton({
+  label,
+  variant,
+  onPress,
+  colors,
+  design,
+}: {
+  label: string;
+  variant: 'primary' | 'secondary';
+  onPress: () => void;
+  colors: Colors;
+  design: Design;
+}) {
+  const { hovered, hoverProps } = useHover();
+  const isPrimary = variant === 'primary';
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      style={[
+        styles.modalBtn,
+        {
+          backgroundColor: isPrimary ? colors.primary : colors.chipBg,
+          borderRadius: design.radius.item,
+        },
+        hovered && { opacity: 0.9 },
+      ]}
+    >
+      <Text
+        style={[
+          design.type.body,
+          { color: isPrimary ? colors.primaryText : colors.text },
+        ]}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+// ── Section wrapper ─────────────────────────────────────
 function Section({
   title,
+  hPad,
   colors,
   design,
   children,
 }: {
   title: string;
+  hPad: number;
   colors: Colors;
   design: Design;
   children: React.ReactNode;
@@ -500,7 +673,7 @@ function Section({
       <Text
         style={[
           design.type.sectionLabel,
-          { color: colors.textMuted, marginHorizontal: 20, marginBottom: 8 },
+          { color: colors.textMuted, marginHorizontal: hPad, marginBottom: 8 },
         ]}
       >
         {title}
@@ -508,8 +681,11 @@ function Section({
       <View
         style={[
           design.card,
-          styles.card,
-          { backgroundColor: colors.surface },
+          {
+            backgroundColor: colors.surface,
+            marginHorizontal: hPad,
+            overflow: 'hidden',
+          },
         ]}
       >
         {children}
@@ -546,11 +722,13 @@ function Stat({
   );
 }
 
+// ── Field row ───────────────────────────────────────────
 function FieldRow({
   icon,
   label,
   value,
   onPress,
+  rowVPad,
   colors,
   design,
   last,
@@ -559,21 +737,27 @@ function FieldRow({
   label: string;
   value: string;
   onPress: () => void;
+  rowVPad: number;
   colors: Colors;
   design: Design;
   last?: boolean;
 }) {
+  const { hovered, hoverProps } = useHover();
+  const isWeb = Platform.OS === 'web';
+
   return (
     <Pressable
+      {...hoverProps}
       onPress={onPress}
-      style={({ pressed }) => [
+      style={[
         styles.row,
+        { paddingVertical: rowVPad },
         !last &&
           design.showRowDividers && {
             borderBottomWidth: StyleSheet.hairlineWidth,
             borderBottomColor: colors.borderSubtle,
           },
-        pressed && { backgroundColor: colors.surfaceElevated },
+        hovered && isWeb && { backgroundColor: colors.surfaceElevated },
       ]}
     >
       <View
@@ -587,7 +771,7 @@ function FieldRow({
       >
         <Feather name={icon} size={16} color={colors.primary} />
       </View>
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={[design.type.caption, { color: colors.textMuted }]}>
           {label}
         </Text>
@@ -606,11 +790,13 @@ function FieldRow({
   );
 }
 
+// ── Action row ──────────────────────────────────────────
 function ActionRow({
   icon,
   label,
   onPress,
   destructive,
+  rowVPad,
   colors,
   design,
   last,
@@ -619,21 +805,27 @@ function ActionRow({
   label: string;
   onPress: () => void;
   destructive?: boolean;
+  rowVPad: number;
   colors: Colors;
   design: Design;
   last?: boolean;
 }) {
+  const { hovered, hoverProps } = useHover();
+  const isWeb = Platform.OS === 'web';
+
   return (
     <Pressable
+      {...hoverProps}
       onPress={onPress}
-      style={({ pressed }) => [
+      style={[
         styles.row,
+        { paddingVertical: rowVPad },
         !last &&
           design.showRowDividers && {
             borderBottomWidth: StyleSheet.hairlineWidth,
             borderBottomColor: colors.borderSubtle,
           },
-        pressed && { backgroundColor: colors.surfaceElevated },
+        hovered && isWeb && { backgroundColor: colors.surfaceElevated },
       ]}
     >
       <View
@@ -675,11 +867,6 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { paddingTop: 12, paddingBottom: 40 },
 
-  headerCard: {
-    marginHorizontal: 16,
-    padding: 24,
-    alignItems: 'center',
-  },
   editBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -701,10 +888,6 @@ const styles = StyleSheet.create({
   },
 
   section: {},
-  card: {
-    marginHorizontal: 16,
-    overflow: 'hidden',
-  },
 
   colorRow: {
     flexDirection: 'row',
@@ -719,6 +902,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 0,
   },
 
   statsRow: {
@@ -744,7 +928,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 14,
     paddingHorizontal: 14,
-    paddingVertical: 14,
     minHeight: 60,
   },
   rowIcon: {
