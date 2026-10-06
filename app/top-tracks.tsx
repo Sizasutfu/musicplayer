@@ -8,6 +8,8 @@ import {
   Image,
   StyleSheet,
   ActivityIndicator,
+  Platform,
+  useWindowDimensions,
 } from 'react-native';
 import {
   SafeAreaView,
@@ -17,19 +19,73 @@ import { Feather } from '@expo/vector-icons';
 import { useLibrary, type Song } from '../hooks/useLibrary';
 import { usePlayer } from '../context/PlayerContext';
 import { useTheme } from '../context/ThemeContext';
+import { useHover } from '../hooks/useHover';
 import BackButton from '../components/BackButton';
 import MiniPlayer from '../components/MiniPlayer';
 import SongActionSheet from '../components/SongActionSheet';
 
 const MAX_ITEMS = 100;
 
+// Matches the content cap used by every other list screen.
+const CONTENT_MAX_WIDTH = 900;
+
 type Ranked = { song: Song; count: number; rank: number };
+
+// ── Responsive sizing ──────────────────────────────────
+type Layout = {
+  hPad: number;
+  artSize: number;
+  rowGap: number;
+  rowVPad: number;
+  rankWidth: number;
+  rankFontSize: number;
+  titleSize: number;
+};
+
+function layoutFor(width: number): Layout {
+  if (width < 500) {
+    return {
+      hPad: 20,
+      artSize: 52,
+      rowGap: 12,
+      rowVPad: 10,
+      rankWidth: 22,
+      rankFontSize: 14,
+      titleSize: 15,
+    };
+  }
+  if (width < 900) {
+    return {
+      hPad: 24,
+      artSize: 60,
+      rowGap: 14,
+      rowVPad: 12,
+      rankWidth: 26,
+      rankFontSize: 15,
+      titleSize: 15,
+    };
+  }
+  return {
+    hPad: 32,
+    artSize: 68,
+    rowGap: 18,
+    rowVPad: 14,
+    rankWidth: 32,
+    rankFontSize: 17,
+    titleSize: 16,
+  };
+}
 
 export default function TopTracksScreen() {
   const { songs, loading } = useLibrary();
   const { playQueue, currentTrack, playCounts } = usePlayer();
   const { colors, design } = useTheme();
   const insets = useSafeAreaInsets();
+
+  const { width } = useWindowDimensions();
+  const isWide = width >= 900;
+  const L = useMemo(() => layoutFor(width), [width]);
+
   const [actionSong, setActionSong] = useState<Song | null>(null);
 
   const ranked: Ranked[] = useMemo(() => {
@@ -117,7 +173,19 @@ export default function TopTracksScreen() {
         </View>
       ) : (
         <>
-          <View style={styles.countRow}>
+          <View
+            style={[
+              styles.countRow,
+              isWide
+                ? {
+                    width: '100%',
+                    maxWidth: CONTENT_MAX_WIDTH,
+                    alignSelf: 'center',
+                  }
+                : undefined,
+              { paddingHorizontal: L.hPad },
+            ]}
+          >
             <Text style={[design.type.caption, { color: colors.textMuted }]}>
               {ranked.length} {ranked.length === 1 ? 'track' : 'tracks'} ·
               ranked by plays
@@ -128,12 +196,23 @@ export default function TopTracksScreen() {
             data={ranked}
             keyExtractor={(entry) => entry.song.id}
             contentContainerStyle={{ paddingBottom: 200 }}
+            showsVerticalScrollIndicator={false}
+            style={
+              isWide
+                ? {
+                    width: '100%',
+                    maxWidth: CONTENT_MAX_WIDTH,
+                    alignSelf: 'center',
+                  }
+                : undefined
+            }
             renderItem={({ item, index }) => (
               <SongRow
                 song={item.song}
                 rank={item.rank}
                 count={item.count}
                 isActive={currentTrack?.id === item.song.id}
+                layout={L}
                 onPress={() => playFrom(index)}
                 onMenu={() => setActionSong(item.song)}
                 colors={colors}
@@ -155,11 +234,15 @@ export default function TopTracksScreen() {
   );
 }
 
+// ── Song row ────────────────────────────────────────────
+// Extracted so it can hold its own hover state. Rendering it
+// inline from the parent's renderItem would be a hook-in-a-loop.
 function SongRow({
   song,
   rank,
   count,
   isActive,
+  layout,
   onPress,
   onMenu,
   colors,
@@ -169,11 +252,15 @@ function SongRow({
   rank: number;
   count: number;
   isActive: boolean;
+  layout: Layout;
   onPress: () => void;
   onMenu: () => void;
   colors: any;
   design: any;
 }) {
+  const { hovered, hoverProps } = useHover();
+  const isWeb = Platform.OS === 'web';
+
   const subtitle =
     song.album && song.album !== 'Unknown Album'
       ? `${song.artist} · ${song.album}`
@@ -181,20 +268,31 @@ function SongRow({
 
   return (
     <Pressable
+      {...hoverProps}
       onPress={onPress}
       onLongPress={onMenu}
       delayLongPress={400}
-      style={({ pressed }) => [
+      style={[
         styles.row,
+        {
+          paddingHorizontal: layout.hPad,
+          paddingVertical: layout.rowVPad,
+          gap: layout.rowGap,
+        },
         isActive && { backgroundColor: colors.rowActive },
-        pressed && { opacity: 0.7 },
+        !isActive && isWeb && hovered && {
+          backgroundColor: colors.surfaceElevated,
+        },
       ]}
     >
-      <View style={styles.rankWrap}>
+      <View style={[styles.rankWrap, { width: layout.rankWidth }]}>
         <Text
           style={[
             styles.rankText,
-            { color: isActive ? colors.primary : colors.textMuted },
+            {
+              fontSize: layout.rankFontSize,
+              color: isActive ? colors.primary : colors.textMuted,
+            },
           ]}
         >
           {rank}
@@ -204,31 +302,29 @@ function SongRow({
       {song.artwork ? (
         <Image
           source={{ uri: song.artwork }}
-          style={[
-            styles.art,
-            {
-              borderRadius: design.radius.item,
-              backgroundColor: colors.artPlaceholder,
-            },
-          ]}
+          style={{
+            width: layout.artSize,
+            height: layout.artSize,
+            borderRadius: design.radius.item,
+            backgroundColor: colors.artPlaceholder,
+          }}
         />
       ) : (
         <View
-          style={[
-            styles.art,
-            {
-              borderRadius: design.radius.item,
-              backgroundColor: isActive
-                ? colors.primary
-                : colors.artPlaceholder,
-              alignItems: 'center',
-              justifyContent: 'center',
-            },
-          ]}
+          style={{
+            width: layout.artSize,
+            height: layout.artSize,
+            borderRadius: design.radius.item,
+            backgroundColor: isActive
+              ? colors.primary
+              : colors.artPlaceholder,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
         >
           <Feather
             name="music"
-            size={20}
+            size={Math.round(layout.artSize * 0.38)}
             color={isActive ? colors.primaryText : colors.iconMuted}
           />
         </View>
@@ -239,7 +335,10 @@ function SongRow({
           numberOfLines={1}
           style={[
             styles.rowTitle,
-            { color: isActive ? colors.primary : colors.text },
+            {
+              color: isActive ? colors.primary : colors.text,
+              fontSize: layout.titleSize,
+            },
           ]}
         >
           {song.title}
@@ -303,35 +402,23 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   countRow: {
-    paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 4,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
   },
   rankWrap: {
-    width: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
   rankText: {
-    fontSize: 14,
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
   },
-  art: {
-    width: 52,
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   rowText: { flex: 1, minWidth: 0 },
-  rowTitle: { fontSize: 15, fontWeight: '600' },
+  rowTitle: { fontWeight: '600' },
   countPill: {
     paddingHorizontal: 4,
   },
