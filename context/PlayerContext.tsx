@@ -153,9 +153,6 @@ async function saveRecentIds(ids: string[]) {
 }
 
 // ── Persisted play counts ──────────────────────────────────
-// Keyed by song ID. No pruning here — the map is small and stale
-// entries are harmless. If it ever grows large (thousands of
-// entries from one-off plays), add a threshold in settings.
 const PLAYS_KEY = 'player:plays:v1';
 
 async function loadPlayCounts(): Promise<Record<string, number>> {
@@ -291,6 +288,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           setShuffleOrder(buildShuffleOrder(last.queue.length, safeIndex));
         }
 
+        // Load the source WITHOUT playing, so the play button works
+        // immediately and the lock screen shows the last track. The
+        // recently-played list is deliberately NOT updated here, so
+        // reopening the app doesn't count as a play.
         try {
           player.replace({ uri: last.track.url });
 
