@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { router, useNavigation } from 'expo-router';
-import { DrawerActions } from '@react-navigation/native';
+import { DrawerActions } from "expo-router/react-navigation";
 import { useProfile } from '../../../hooks/useProfile';
 import { usePlaylists } from '../../../hooks/usePlaylists';
 import { useLibrary, type Song } from '../../../hooks/useLibrary';
