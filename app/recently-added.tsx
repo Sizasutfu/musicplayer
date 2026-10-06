@@ -8,6 +8,8 @@ import {
   Image,
   StyleSheet,
   ActivityIndicator,
+  Platform,
+  useWindowDimensions,
 } from 'react-native';
 import {
   SafeAreaView,
@@ -18,6 +20,7 @@ import { useLibrary, type Song } from '../hooks/useLibrary';
 import { useRecentlyAdded } from '../hooks/useRecentlyAdded';
 import { usePlayer } from '../context/PlayerContext';
 import { useTheme } from '../context/ThemeContext';
+import { useHover } from '../hooks/useHover';
 import BackButton from '../components/BackButton';
 import MiniPlayer from '../components/MiniPlayer';
 import SongActionSheet from '../components/SongActionSheet';
@@ -26,6 +29,29 @@ import SongActionSheet from '../components/SongActionSheet';
 // render thousands of rows. 100 covers any realistic "recently
 // added" set within the 30-day window.
 const MAX_ITEMS = 100;
+
+// Matches the content cap used by library and the other pushed
+// list screens so navigation between them feels consistent.
+const CONTENT_MAX_WIDTH = 900;
+
+// ── Responsive sizing ──────────────────────────────────
+type Layout = {
+  hPad: number;
+  artSize: number;
+  rowGap: number;
+  rowVPad: number;
+  titleSize: number;
+};
+
+function layoutFor(width: number): Layout {
+  if (width < 500) {
+    return { hPad: 20, artSize: 52, rowGap: 14, rowVPad: 10, titleSize: 15 };
+  }
+  if (width < 900) {
+    return { hPad: 24, artSize: 60, rowGap: 16, rowVPad: 12, titleSize: 15 };
+  }
+  return { hPad: 32, artSize: 68, rowGap: 20, rowVPad: 14, titleSize: 16 };
+}
 
 function relativeTime(ms: number): string {
   const diff = Date.now() - ms;
@@ -43,6 +69,11 @@ export default function RecentlyAddedScreen() {
   const { playQueue, currentTrack } = usePlayer();
   const { colors, design } = useTheme();
   const insets = useSafeAreaInsets();
+
+  const { width } = useWindowDimensions();
+  const isWide = width >= 900;
+  const L = useMemo(() => layoutFor(width), [width]);
+
   const [actionSong, setActionSong] = useState<Song | null>(null);
 
   const recentlyAdded = useRecentlyAdded(songs);
@@ -111,7 +142,19 @@ export default function RecentlyAddedScreen() {
         </View>
       ) : (
         <>
-          <View style={styles.countRow}>
+          <View
+            style={[
+              styles.countRow,
+              isWide
+                ? {
+                    width: '100%',
+                    maxWidth: CONTENT_MAX_WIDTH,
+                    alignSelf: 'center',
+                  }
+                : undefined,
+              { paddingHorizontal: L.hPad },
+            ]}
+          >
             <Text style={[design.type.caption, { color: colors.textMuted }]}>
               {items.length} {items.length === 1 ? 'track' : 'tracks'}
             </Text>
@@ -121,11 +164,22 @@ export default function RecentlyAddedScreen() {
             data={items}
             keyExtractor={(entry) => entry.song.id}
             contentContainerStyle={{ paddingBottom: 200 }}
+            showsVerticalScrollIndicator={false}
+            style={
+              isWide
+                ? {
+                    width: '100%',
+                    maxWidth: CONTENT_MAX_WIDTH,
+                    alignSelf: 'center',
+                  }
+                : undefined
+            }
             renderItem={({ item, index }) => (
               <SongRow
                 song={item.song}
                 subtitle={relativeTime(item.addedAt)}
                 isActive={currentTrack?.id === item.song.id}
+                layout={L}
                 onPress={() =>
                   playQueue(
                     items.map((i) => i.song),
@@ -152,10 +206,14 @@ export default function RecentlyAddedScreen() {
   );
 }
 
+// ── Song row ────────────────────────────────────────────
+// Extracted so it can hold its own hover state. Rendering it
+// inline from the parent's renderItem would be a hook-in-a-loop.
 function SongRow({
   song,
   subtitle,
   isActive,
+  layout,
   onPress,
   onMenu,
   colors,
@@ -164,50 +222,60 @@ function SongRow({
   song: Song;
   subtitle: string;
   isActive: boolean;
+  layout: Layout;
   onPress: () => void;
   onMenu: () => void;
   colors: any;
   design: any;
 }) {
+  const { hovered, hoverProps } = useHover();
+  const isWeb = Platform.OS === 'web';
+
   return (
     <Pressable
+      {...hoverProps}
       onPress={onPress}
       onLongPress={onMenu}
       delayLongPress={400}
-      style={({ pressed }) => [
+      style={[
         styles.row,
+        {
+          paddingHorizontal: layout.hPad,
+          paddingVertical: layout.rowVPad,
+          gap: layout.rowGap,
+        },
         isActive && { backgroundColor: colors.rowActive },
-        pressed && { opacity: 0.7 },
+        !isActive && isWeb && hovered && {
+          backgroundColor: colors.surfaceElevated,
+        },
       ]}
     >
       {song.artwork ? (
         <Image
           source={{ uri: song.artwork }}
-          style={[
-            styles.art,
-            {
-              borderRadius: design.radius.item,
-              backgroundColor: colors.artPlaceholder,
-            },
-          ]}
+          style={{
+            width: layout.artSize,
+            height: layout.artSize,
+            borderRadius: design.radius.item,
+            backgroundColor: colors.artPlaceholder,
+          }}
         />
       ) : (
         <View
-          style={[
-            styles.art,
-            {
-              borderRadius: design.radius.item,
-              backgroundColor: isActive
-                ? colors.primary
-                : colors.artPlaceholder,
-              alignItems: 'center',
-              justifyContent: 'center',
-            },
-          ]}
+          style={{
+            width: layout.artSize,
+            height: layout.artSize,
+            borderRadius: design.radius.item,
+            backgroundColor: isActive
+              ? colors.primary
+              : colors.artPlaceholder,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
         >
           <Feather
             name="music"
-            size={20}
+            size={Math.round(layout.artSize * 0.38)}
             color={isActive ? colors.primaryText : colors.iconMuted}
           />
         </View>
@@ -218,7 +286,10 @@ function SongRow({
           numberOfLines={1}
           style={[
             styles.rowTitle,
-            { color: isActive ? colors.primary : colors.text },
+            {
+              color: isActive ? colors.primary : colors.text,
+              fontSize: layout.titleSize,
+            },
           ]}
         >
           {song.title}
@@ -267,25 +338,15 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   countRow: {
-    paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 4,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-  },
-  art: {
-    width: 52,
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   rowText: { flex: 1, minWidth: 0 },
-  rowTitle: { fontSize: 15, fontWeight: '600' },
+  rowTitle: { fontWeight: '600' },
   menuBtn: {
     width: 36,
     height: 36,
