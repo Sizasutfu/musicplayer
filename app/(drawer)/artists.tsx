@@ -8,6 +8,8 @@ import {
   Image,
   ActivityIndicator,
   StyleSheet,
+  Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -15,11 +17,37 @@ import { useLibrary } from '../../hooks/useLibrary';
 import { groupByArtist, type Artist } from '../../lib/metadata';
 import { useTheme } from '../../context/ThemeContext';
 import { useHeaderBack } from '../../hooks/useHeaderBack';
+import { useHover } from '../../hooks/useHover';
 import MiniPlayer from '../../components/MiniPlayer';
+
+// Matches the cap used by library and other list screens so
+// artist lists don't stretch edge-to-edge on a wide browser.
+const CONTENT_MAX_WIDTH = 900;
+
+// ── Responsive sizing ──────────────────────────────────
+type Layout = {
+  hPad: number;
+  avatarSize: number;
+  gap: number;
+  rowVPad: number;
+};
+
+function layoutFor(width: number): Layout {
+  if (width < 500) {
+    return { hPad: 20, avatarSize: 52, gap: 14, rowVPad: 12 };
+  }
+  if (width < 900) {
+    return { hPad: 24, avatarSize: 60, gap: 16, rowVPad: 14 };
+  }
+  return { hPad: 32, avatarSize: 68, gap: 20, rowVPad: 16 };
+}
 
 export default function ArtistsScreen() {
   const { songs, loading } = useLibrary();
   const { colors, design } = useTheme();
+  const { width } = useWindowDimensions();
+  const isWide = width >= 900;
+  const L = useMemo(() => layoutFor(width), [width]);
 
   useHeaderBack('Artists');
 
@@ -58,31 +86,60 @@ export default function ArtistsScreen() {
         data={artists}
         keyExtractor={(item) => item.key}
         contentContainerStyle={styles.listContent}
+        style={
+          isWide
+            ? {
+                width: '100%',
+                maxWidth: CONTENT_MAX_WIDTH,
+                alignSelf: 'center',
+              }
+            : undefined
+        }
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <Text
             style={[
               design.type.caption,
-              { color: colors.textMuted, marginBottom: design.spacing.item - 4 },
+              {
+                color: colors.textMuted,
+                marginBottom: design.spacing.item - 4,
+                paddingHorizontal: L.hPad,
+              },
             ]}
           >
             {artists.length} {artists.length === 1 ? 'artist' : 'artists'}
           </Text>
         }
-        renderItem={({ item }) => <ArtistRow artist={item} />}
+        renderItem={({ item }) => (
+          <ArtistRow artist={item} layout={L} />
+        )}
       />
       <MiniPlayer />
     </View>
   );
 }
 
-function ArtistRow({ artist }: { artist: Artist }) {
+// ── Artist row ──────────────────────────────────────────
+// Extracted so it can hold its own hover state. Rendering it
+// inline from the parent's renderItem would be a hook-in-a-loop.
+function ArtistRow({
+  artist,
+  layout,
+}: {
+  artist: Artist;
+  layout: Layout;
+}) {
   const { colors, design } = useTheme();
+  const { hovered, hoverProps } = useHover();
+  const isWeb = Platform.OS === 'web';
+
   const albumCount = artist.albums.length;
   const trackCount = artist.totalTracks;
+  const avatarRadius = layout.avatarSize / 2;
 
   return (
     <Pressable
+      {...hoverProps}
       onPress={() =>
         router.push({
           pathname: '/artist/[name]',
@@ -92,38 +149,54 @@ function ArtistRow({ artist }: { artist: Artist }) {
       style={({ pressed }) => [
         styles.row,
         {
-          paddingVertical: design.row.paddingVertical + 2,
-          borderBottomWidth: design.row.borderBottomWidth,
-          borderBottomColor: design.row.borderBottomColor,
+          paddingHorizontal: layout.hPad,
+          paddingVertical: layout.rowVPad,
+          gap: layout.gap,
         },
-        pressed && { backgroundColor: colors.surfaceElevated },
+        isWeb && hovered && { backgroundColor: colors.surfaceElevated },
+        pressed && { opacity: 0.7 },
       ]}
     >
       {artist.artwork ? (
         <Image
           source={{ uri: artist.artwork }}
-          style={[styles.avatar, { borderRadius: 26 }]}
+          style={{
+            width: layout.avatarSize,
+            height: layout.avatarSize,
+            borderRadius: avatarRadius,
+            backgroundColor: colors.artPlaceholder,
+          }}
         />
       ) : (
         <View
-          style={[
-            styles.avatar,
-            {
-              borderRadius: 26,
-              backgroundColor: colors.artPlaceholder,
-              alignItems: 'center',
-              justifyContent: 'center',
-            },
-          ]}
+          style={{
+            width: layout.avatarSize,
+            height: layout.avatarSize,
+            borderRadius: avatarRadius,
+            backgroundColor: colors.artPlaceholder,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
         >
-          <Feather name="user" size={22} color={colors.iconMuted} />
+          <Feather
+            name="user"
+            size={Math.round(layout.avatarSize * 0.42)}
+            color={colors.iconMuted}
+          />
         </View>
       )}
 
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, minWidth: 0 }}>
         <Text
           numberOfLines={1}
-          style={[design.type.body, { color: colors.text, fontWeight: '600' }]}
+          style={[
+            design.type.body,
+            {
+              color: colors.text,
+              fontWeight: '600',
+              fontSize: layout.avatarSize >= 68 ? 16 : 15,
+            },
+          ]}
         >
           {artist.name}
         </Text>
@@ -162,8 +235,5 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    paddingHorizontal: 20,
   },
-  avatar: { width: 52, height: 52 },
 });
