@@ -8,7 +8,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import * as MediaLibrary from 'expo-media-library';
+import * as MediaLibrary from 'expo-media-library/legacy';
 import {
   type TrackMetadata,
   mergeMetadata,
@@ -76,7 +76,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
       setGranted(true);
 
       const { assets } = await MediaLibrary.getAssetsAsync({
-        mediaType: MediaLibrary.MediaType.AUDIO,
+        mediaType: MediaLibrary.MediaType.audio,
         first: 1000,
         sortBy: ['default'],
       });
