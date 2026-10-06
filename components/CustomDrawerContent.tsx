@@ -8,15 +8,14 @@ import Constants from 'expo-constants';
 import { router, usePathname } from 'expo-router';
 import { useTheme } from '../context/ThemeContext';
 import { useProfile } from '../hooks/useProfile';
+import { useHover } from '../hooks/useHover';
 import ProfileAvatar from './ProfileAvatar';
 
 type Item = {
   label: string;
   icon: React.ComponentProps<typeof Feather>['name'];
-  /** URL-form route. Matches what usePathname() returns. */
+  /** File-system route. Matches what router.push expects. */
   route: string;
-  /** Also match these prefix paths for active highlighting. */
-  matchPrefix?: string;
 };
 
 const PRIMARY: Item[] = [
@@ -61,17 +60,77 @@ function toUrlPath(route: string): string {
   return stripped === '' ? '/' : stripped;
 }
 
+function isRouteActive(pathname: string, route: string): boolean {
+  const urlPath = toUrlPath(route);
+  // Home matches only the exact root — otherwise every route
+  // "starts with /" and Home would always be highlighted.
+  if (urlPath === '/') return pathname === '/' || pathname === '';
+  return pathname === urlPath || pathname.startsWith(urlPath + '/');
+}
+
+// ── Nav item ────────────────────────────────────────────
+// Extracted so each row can hold its own hover state. Rendered
+// from the parent's map() would be a hook-in-a-loop violation.
+function NavItem({
+  item,
+  active,
+  onPress,
+}: {
+  item: Item;
+  active: boolean;
+  onPress: () => void;
+}) {
+  const { colors, design } = useTheme();
+  const { hovered, hoverProps } = useHover();
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.row,
+        {
+          borderRadius: design.radius.item,
+          marginBottom: design.spacing.item - 10,
+        },
+        active && { backgroundColor: colors.rowActive },
+        !active && hovered && { backgroundColor: colors.surfaceElevated },
+        pressed && { opacity: 0.6 },
+      ]}
+    >
+      <Feather
+        name={item.icon}
+        size={20}
+        color={active ? colors.primary : colors.iconMuted}
+      />
+      <Text
+        style={[
+          design.type.body,
+          { color: active ? colors.primary : colors.textSecondary },
+          active && { fontWeight: '700' },
+        ]}
+      >
+        {item.label}
+      </Text>
+      {active && (
+        <View
+          style={[styles.activeDot, { backgroundColor: colors.primary }]}
+        />
+      )}
+    </Pressable>
+  );
+}
+
 export default function CustomDrawerContent(
   props: DrawerContentComponentProps
 ) {
   const { colors, design } = useTheme();
   const { profile } = useProfile();
   const pathname = usePathname();
+  const profileHover = useHover();
 
   const goToProfile = () => {
     router.push('/(drawer)/profile');
-    // With a permanent drawer on wide screens, closeDrawer is a
-    // no-op. Fine to call unconditionally.
     props.navigation.closeDrawer();
   };
 
@@ -80,70 +139,19 @@ export default function CustomDrawerContent(
     props.navigation.closeDrawer();
   };
 
-  const isActive = (item: Item) => {
-    const urlPath = toUrlPath(item.route);
-
-    // Home matches only the exact root — otherwise every route
-    // "starts with /" and Home would always be highlighted.
-    if (urlPath === '/') {
-      return pathname === '/' || pathname === '';
-    }
-
-    // Everything else matches itself or a nested path underneath
-    // (e.g., /playlist/123 still highlights /playlists via the
-    // matchPrefix override if you add one).
-    return pathname === urlPath || pathname.startsWith(urlPath + '/');
-  };
-
-  const renderItem = (item: Item) => {
-    const active = isActive(item);
-    return (
-      <Pressable
-        key={item.route}
-        onPress={() => go(item.route)}
-        style={({ pressed }) => [
-          styles.row,
-          {
-            borderRadius: design.radius.item,
-            marginBottom: design.spacing.item - 10,
-          },
-          active && { backgroundColor: colors.rowActive },
-          pressed && { opacity: 0.6 },
-        ]}
-      >
-        <Feather
-          name={item.icon}
-          size={20}
-          color={active ? colors.primary : colors.iconMuted}
-        />
-        <Text
-          style={[
-            design.type.body,
-            { color: active ? colors.primary : colors.textSecondary },
-            active && { fontWeight: '700' },
-          ]}
-        >
-          {item.label}
-        </Text>
-        {active && (
-          <View
-            style={[styles.activeDot, { backgroundColor: colors.primary }]}
-          />
-        )}
-      </Pressable>
-    );
-  };
-
   return (
     <SafeAreaView
       style={[styles.root, { backgroundColor: colors.surface }]}
       edges={['top', 'bottom']}
     >
       <Pressable
+        {...profileHover.hoverProps}
         onPress={goToProfile}
-        style={({ pressed }) => [
+        style={[
           styles.profileHeader,
-          pressed && { opacity: 0.7 },
+          profileHover.hovered && {
+            backgroundColor: colors.surfaceElevated,
+          },
         ]}
       >
         <ProfileAvatar
@@ -194,7 +202,14 @@ export default function CustomDrawerContent(
         >
           YOUR MUSIC
         </Text>
-        {PRIMARY.map(renderItem)}
+        {PRIMARY.map((item) => (
+          <NavItem
+            key={item.route}
+            item={item}
+            active={isRouteActive(pathname, item.route)}
+            onPress={() => go(item.route)}
+          />
+        ))}
 
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
@@ -210,7 +225,14 @@ export default function CustomDrawerContent(
         >
           BROWSE
         </Text>
-        {BROWSE.map(renderItem)}
+        {BROWSE.map((item) => (
+          <NavItem
+            key={item.route}
+            item={item}
+            active={isRouteActive(pathname, item.route)}
+            onPress={() => go(item.route)}
+          />
+        ))}
       </ScrollView>
 
       <View style={[styles.footer, { borderTopColor: colors.border }]}>

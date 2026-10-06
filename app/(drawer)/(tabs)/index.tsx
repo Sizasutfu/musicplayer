@@ -19,14 +19,11 @@ import { useLibrary, type Song } from '../../../hooks/useLibrary';
 import { useRecentlyAdded } from '../../../hooks/useRecentlyAdded';
 import { useTheme } from '../../../context/ThemeContext';
 import { usePlayer } from '../../../context/PlayerContext';
+import { useHover } from '../../../hooks/useHover';
 import MiniPlayer from '../../../components/MiniPlayer';
 
-// Content is capped at this width and centered on wide viewports,
-// so text doesn't stretch edge-to-edge on desktop browsers.
 const CONTENT_MAX_WIDTH = 1200;
 
-// Horizontal padding inside the content wrapper. Wider on large
-// screens so the content isn't flush against the container edges.
 function contentPadding(isWide: boolean) {
   return isWide ? 32 : 20;
 }
@@ -50,11 +47,6 @@ export default function HomeScreen() {
   const { playQueue, recentIds, playCounts } = usePlayer();
   const navigation = useNavigation();
 
-  // ── Responsive ─────────────────────────────────────────
-  // Breakpoints:
-  //   compact  < 500   phone portrait
-  //   medium  500-899  phone landscape / small tablet
-  //   wide     >= 900  tablet landscape / desktop browser
   const { width } = useWindowDimensions();
   const isCompact = width < 500;
   const isMedium = width >= 500 && width < 900;
@@ -74,7 +66,6 @@ export default function HomeScreen() {
     else navigation.dispatch(DrawerActions.toggleDrawer());
   }, [navigation]);
 
-  // ── Time-based greeting ────────────────────────────────
   const greeting = useMemo(() => {
     const h = new Date().getHours();
     if (h < 5) return 'Good night';
@@ -186,9 +177,6 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Content wrapper — caps width and centers on wide
-            viewports. All inner sections use the same padding
-            value so they align to the same gutter. */}
         <View
           style={{
             width: '100%',
@@ -196,40 +184,25 @@ export default function HomeScreen() {
             alignSelf: 'center',
           }}
         >
-          {/* ── Header ──────────────────────────────────── */}
+          {/* ── Header ────────────────────────────────── */}
           <View style={[styles.header, { paddingHorizontal: hPad }]}>
-            <Pressable
+            <HeaderIconButton
+              icon="menu"
               onPress={openDrawer}
-              hitSlop={10}
-              style={[
-                styles.headerIconBtn,
-                { backgroundColor: colors.chipBg },
-              ]}
-            >
-              <Feather name="menu" size={22} color={colors.icon} />
-            </Pressable>
+              colors={colors}
+            />
 
             <View style={styles.headerActions}>
-              <Pressable
+              <HeaderIconButton
+                icon="search"
                 onPress={() => router.push('/library')}
-                style={[
-                  styles.headerIconBtn,
-                  { backgroundColor: colors.chipBg },
-                ]}
-                hitSlop={6}
-              >
-                <Feather name="search" size={20} color={colors.icon} />
-              </Pressable>
-              <Pressable
+                colors={colors}
+              />
+              <HeaderIconButton
+                icon="heart"
                 onPress={() => router.push('/favorites')}
-                style={[
-                  styles.headerIconBtn,
-                  { backgroundColor: colors.chipBg },
-                ]}
-                hitSlop={6}
-              >
-                <Feather name="heart" size={20} color={colors.icon} />
-              </Pressable>
+                colors={colors}
+              />
             </View>
           </View>
 
@@ -246,12 +219,9 @@ export default function HomeScreen() {
             {greeting}, <Text style={styles.greetingName}>{firstName}</Text>
           </Text>
 
-          {/* ── Today's pick ────────────────────────────── */}
+          {/* ── Today's pick ──────────────────────────── */}
           {todaysPick && (
-            <Section
-              title="Today's pick"
-              paddingHorizontal={hPad}
-            >
+            <Section title="Today's pick" paddingHorizontal={hPad}>
               <FeaturedCard
                 title={todaysPick.title}
                 subtitle={todaysPick.subtitle}
@@ -265,7 +235,7 @@ export default function HomeScreen() {
             </Section>
           )}
 
-          {/* ── Recently played ─────────────────────────── */}
+          {/* ── Recently played ───────────────────────── */}
           {recentSongs.length > 0 && (
             <Section
               title="Recently played"
@@ -295,7 +265,7 @@ export default function HomeScreen() {
             </Section>
           )}
 
-          {/* ── Top tracks ──────────────────────────────── */}
+          {/* ── Top tracks ────────────────────────────── */}
           {topTracks.length > 0 && (
             <Section
               title="Your top tracks"
@@ -331,7 +301,7 @@ export default function HomeScreen() {
             </Section>
           )}
 
-          {/* ── Recently added ──────────────────────────── */}
+          {/* ── Recently added ────────────────────────── */}
           {recentlyAddedTop.length > 0 && (
             <Section
               title="Recently added"
@@ -366,23 +336,18 @@ export default function HomeScreen() {
             </Section>
           )}
 
-          {/* ── Top daily playlists ─────────────────────── */}
+          {/* ── Top daily playlists ───────────────────── */}
           <View
             style={[styles.sectionHeader, { paddingHorizontal: hPad }]}
           >
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
               Top daily playlists
             </Text>
-            <Pressable onPress={() => router.push('/playlists')} hitSlop={8}>
-              <Text
-                style={[
-                  design.type.caption,
-                  { color: colors.textSecondary, fontWeight: '600' },
-                ]}
-              >
-                See all
-              </Text>
-            </Pressable>
+            <SeeAllLink
+              onPress={() => router.push('/playlists')}
+              colors={colors}
+              design={design}
+            />
           </View>
 
           <View style={{ marginTop: 12 }}>
@@ -447,7 +412,35 @@ export default function HomeScreen() {
   );
 }
 
-// ── Section wrapper ──────────────────────────────────────
+// ── Header icon button ──────────────────────────────────
+function HeaderIconButton({
+  icon,
+  onPress,
+  colors,
+}: {
+  icon: React.ComponentProps<typeof Feather>['name'];
+  onPress: () => void;
+  colors: any;
+}) {
+  const { hovered, hoverProps } = useHover();
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      hitSlop={6}
+      style={[
+        styles.headerIconBtn,
+        { backgroundColor: colors.chipBg },
+        hovered && { backgroundColor: colors.surfaceElevated },
+      ]}
+    >
+      <Feather name={icon} size={icon === 'menu' ? 22 : 20} color={colors.icon} />
+    </Pressable>
+  );
+}
+
+// ── Section wrapper ─────────────────────────────────────
 function Section({
   title,
   onSeeAll,
@@ -462,26 +455,12 @@ function Section({
   const { colors, design } = useTheme();
   return (
     <>
-      <View
-        style={[
-          styles.sectionHeader,
-          { paddingHorizontal },
-        ]}
-      >
+      <View style={[styles.sectionHeader, { paddingHorizontal }]}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
           {title}
         </Text>
         {onSeeAll && (
-          <Pressable onPress={onSeeAll} hitSlop={8}>
-            <Text
-              style={[
-                design.type.caption,
-                { color: colors.textSecondary, fontWeight: '600' },
-              ]}
-            >
-              See all
-            </Text>
-          </Pressable>
+          <SeeAllLink onPress={onSeeAll} colors={colors} design={design} />
         )}
       </View>
       {children}
@@ -489,7 +468,44 @@ function Section({
   );
 }
 
-// ── Song tile ────────────────────────────────────────────
+// ── See all link ────────────────────────────────────────
+function SeeAllLink({
+  onPress,
+  colors,
+  design,
+}: {
+  onPress: () => void;
+  colors: any;
+  design: any;
+}) {
+  const { hovered, hoverProps } = useHover();
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      hitSlop={8}
+      style={[
+        styles.seeAllBtn,
+        hovered && { backgroundColor: colors.surfaceElevated },
+      ]}
+    >
+      <Text
+        style={[
+          design.type.caption,
+          {
+            color: hovered ? colors.primary : colors.textSecondary,
+            fontWeight: '600',
+          },
+        ]}
+      >
+        See all
+      </Text>
+    </Pressable>
+  );
+}
+
+// ── Song tile ───────────────────────────────────────────
 function SongTile({
   song,
   subtitle,
@@ -507,8 +523,11 @@ function SongTile({
   design: any;
   onPress: () => void;
 }) {
+  const { hovered, hoverProps } = useHover();
+
   return (
     <Pressable
+      {...hoverProps}
       onPress={onPress}
       style={({ pressed }) => [
         { width: size },
@@ -546,6 +565,37 @@ function SongTile({
             <Feather name="music" size={24} color={colors.iconMuted} />
           </View>
         )}
+
+        {/* Hover overlay — a subtle dark scrim across the artwork.
+            On native this never triggers since hovered stays false. */}
+        {hovered && (
+          <View
+            pointerEvents="none"
+            style={[
+              styles.tileHoverOverlay,
+              {
+                width: size,
+                height: size,
+                borderRadius: design.radius.item,
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.tileHoverPlay,
+                { backgroundColor: colors.primary },
+              ]}
+            >
+              <Feather
+                name="play"
+                size={20}
+                color={colors.primaryText}
+                style={{ marginLeft: 2 }}
+              />
+            </View>
+          </View>
+        )}
+
         {rank !== undefined && (
           <View
             style={[
@@ -553,9 +603,7 @@ function SongTile({
               { backgroundColor: colors.primary },
             ]}
           >
-            <Text
-              style={[styles.rankText, { color: colors.primaryText }]}
-            >
+            <Text style={[styles.rankText, { color: colors.primaryText }]}>
               {rank}
             </Text>
           </View>
@@ -565,7 +613,11 @@ function SongTile({
         numberOfLines={1}
         style={[
           design.type.body,
-          { color: colors.text, fontWeight: '600', marginTop: 8 },
+          {
+            color: hovered ? colors.primary : colors.text,
+            fontWeight: '600',
+            marginTop: 8,
+          },
         ]}
       >
         {song.title}
@@ -583,7 +635,7 @@ function SongTile({
   );
 }
 
-// ── Featured card ────────────────────────────────────────
+// ── Featured card ───────────────────────────────────────
 function FeaturedCard({
   title,
   subtitle,
@@ -645,30 +697,24 @@ function FeaturedCard({
         </Text>
 
         <View style={styles.featuredActions}>
-          <Pressable
-            onPress={onPlay}
-            style={[
-              styles.featuredPlayBtn,
-              { backgroundColor: colors.primary },
-            ]}
-            hitSlop={6}
-          >
-            <Feather
-              name="play"
-              size={20}
-              color={colors.primaryText}
-              style={{ marginLeft: 2 }}
-            />
-          </Pressable>
-          <Pressable hitSlop={8} style={styles.featuredIcon}>
-            <Feather name="heart" size={20} color={colors.text} />
-          </Pressable>
-          <Pressable hitSlop={8} style={styles.featuredIcon}>
-            <Feather name="download" size={20} color={colors.text} />
-          </Pressable>
-          <Pressable hitSlop={8} style={styles.featuredIcon}>
-            <Feather name="more-horizontal" size={20} color={colors.text} />
-          </Pressable>
+          <FeaturedPlayButton onPress={onPlay} colors={colors} />
+          <FeaturedIconButton
+            icon="heart"
+            colors={colors}
+            onPress={() => {
+              // Wire up later — matches the previous placeholder.
+            }}
+          />
+          <FeaturedIconButton
+            icon="download"
+            colors={colors}
+            onPress={() => {}}
+          />
+          <FeaturedIconButton
+            icon="more-horizontal"
+            colors={colors}
+            onPress={() => {}}
+          />
         </View>
       </View>
 
@@ -703,7 +749,66 @@ function FeaturedCard({
   );
 }
 
-// ── Playlist row ─────────────────────────────────────────
+function FeaturedPlayButton({
+  onPress,
+  colors,
+}: {
+  onPress: () => void;
+  colors: any;
+}) {
+  const { hovered, hoverProps } = useHover();
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      hitSlop={6}
+      style={[
+        styles.featuredPlayBtn,
+        { backgroundColor: colors.primary },
+        hovered && { opacity: 0.9 },
+      ]}
+    >
+      <Feather
+        name="play"
+        size={20}
+        color={colors.primaryText}
+        style={{ marginLeft: 2 }}
+      />
+    </Pressable>
+  );
+}
+
+function FeaturedIconButton({
+  icon,
+  onPress,
+  colors,
+}: {
+  icon: React.ComponentProps<typeof Feather>['name'];
+  onPress: () => void;
+  colors: any;
+}) {
+  const { hovered, hoverProps } = useHover();
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      hitSlop={8}
+      style={[
+        styles.featuredIcon,
+        hovered && {
+          backgroundColor: colors.surfaceElevated,
+          borderRadius: 6,
+        },
+      ]}
+    >
+      <Feather name={icon} size={20} color={colors.text} />
+    </Pressable>
+  );
+}
+
+// ── Playlist row ────────────────────────────────────────
 function PlaylistRow({
   name,
   songs,
@@ -721,16 +826,20 @@ function PlaylistRow({
   onPress: () => void;
   onPlay: () => void;
 }) {
+  const { hovered, hoverProps } = useHover();
+
   const cover = songs[0]?.artwork;
   const artist = songs[0]?.artist;
   const songCount = songs.length;
 
   return (
     <Pressable
+      {...hoverProps}
       onPress={onPress}
       style={({ pressed }) => [
         styles.playlistRow,
         { paddingHorizontal },
+        hovered && { backgroundColor: colors.surfaceElevated },
         pressed && { opacity: 0.7 },
       ]}
     >
@@ -781,18 +890,44 @@ function PlaylistRow({
         </Text>
       </View>
 
-      <Pressable
+      <PlaylistPlayButton
         onPress={onPlay}
         disabled={songCount === 0}
-        hitSlop={10}
-        style={[
-          styles.playlistPlayBtn,
-          { backgroundColor: colors.chipBg },
-          songCount === 0 && { opacity: 0.4 },
-        ]}
-      >
-        <Feather name="play" size={16} color={colors.icon} />
-      </Pressable>
+        colors={colors}
+      />
+    </Pressable>
+  );
+}
+
+function PlaylistPlayButton({
+  onPress,
+  disabled,
+  colors,
+}: {
+  onPress: () => void;
+  disabled?: boolean;
+  colors: any;
+}) {
+  const { hovered, hoverProps } = useHover();
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      disabled={disabled}
+      hitSlop={10}
+      style={[
+        styles.playlistPlayBtn,
+        { backgroundColor: colors.chipBg },
+        hovered && !disabled && { backgroundColor: colors.primary },
+        disabled && { opacity: 0.4 },
+      ]}
+    >
+      <Feather
+        name="play"
+        size={16}
+        color={hovered && !disabled ? colors.primaryText : colors.icon}
+      />
     </Pressable>
   );
 }
@@ -839,6 +974,11 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: -0.3,
   },
+  seeAllBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
 
   // ── Tiles ────────────────────────────────────────────
   tileRow: {
@@ -846,6 +986,26 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   tileArt: {},
+  tileHoverOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tileHoverPlay: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
   rankBadge: {
     position: 'absolute',
     top: 8,
@@ -885,7 +1045,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  featuredIcon: { padding: 4 },
+  featuredIcon: {
+    padding: 6,
+  },
   featuredArt: {
     height: '100%',
   },
@@ -896,6 +1058,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 14,
     paddingVertical: 10,
+    borderRadius: 12,
   },
   playlistArt: {
     width: 60,

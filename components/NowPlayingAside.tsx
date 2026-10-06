@@ -12,6 +12,7 @@ import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { usePlayer } from '../context/PlayerContext';
 import { useTheme } from '../context/ThemeContext';
+import { useHover } from '../hooks/useHover';
 import { likeKey } from '../lib/circle';
 import SeekBar from './SeekBar';
 import LikeButton from './LikeButton';
@@ -65,9 +66,6 @@ export default function NowPlayingAside() {
   const artwork = (currentTrack as any)?.artwork as string | undefined;
 
   // ── Up next ────────────────────────────────────────────
-  // The first N tracks after the currently-playing one. When the
-  // current track is last, the slice is empty and the section
-  // hides entirely.
   const upNextStart = queueIndex + 1;
   const upNext = queue.slice(upNextStart, upNextStart + UP_NEXT_PREVIEW);
 
@@ -76,6 +74,7 @@ export default function NowPlayingAside() {
   };
 
   const queuePosition = queue.length > 0 ? queueIndex + 1 : 0;
+  const hasMoreAfterPreview = queue.length > UP_NEXT_PREVIEW + 1;
 
   return (
     <View
@@ -169,17 +168,10 @@ export default function NowPlayingAside() {
                 )}
               </View>
               <LikeButton uri={likeKey(currentTrack)} size={22} hitSlop={10} />
-              <Pressable
+              <MenuButton
                 onPress={() => setActionSong(currentTrack)}
-                hitSlop={10}
-                style={styles.menuBtn}
-              >
-                <Feather
-                  name="more-vertical"
-                  size={20}
-                  color={colors.iconMuted}
-                />
-              </Pressable>
+                colors={colors}
+              />
             </View>
 
             <View style={styles.seekWrap}>
@@ -216,58 +208,47 @@ export default function NowPlayingAside() {
             </View>
 
             <View style={styles.controls}>
-              <Pressable
+              <TransportButton
+                icon="shuffle"
+                size={18}
                 onPress={toggleShuffle}
-                hitSlop={8}
-                style={styles.smallBtn}
-              >
-                <Feather
-                  name="shuffle"
-                  size={18}
-                  color={shuffle ? colors.primary : colors.iconMuted}
-                />
-              </Pressable>
+                color={shuffle ? colors.primary : colors.iconMuted}
+                colors={colors}
+              />
 
-              <Pressable
+              <TransportButton
+                icon="skip-back"
+                size={24}
                 onPress={previous}
-                hitSlop={8}
-                style={styles.ctrlBtn}
-              >
-                <Feather name="skip-back" size={24} color={colors.icon} />
-              </Pressable>
+                color={colors.icon}
+                colors={colors}
+                wide
+              />
 
-              <Pressable
+              <PlayPauseButton
+                isPlaying={isPlaying}
                 onPress={togglePlayPause}
-                style={[
-                  styles.playBtn,
-                  { backgroundColor: colors.primary },
-                ]}
-                hitSlop={6}
-              >
-                <Feather
-                  name={isPlaying ? 'pause' : 'play'}
-                  size={26}
-                  color={colors.primaryText}
-                  style={{ marginLeft: isPlaying ? 0 : 3 }}
-                />
-              </Pressable>
+                colors={colors}
+              />
 
-              <Pressable onPress={next} hitSlop={8} style={styles.ctrlBtn}>
-                <Feather name="skip-forward" size={24} color={colors.icon} />
-              </Pressable>
+              <TransportButton
+                icon="skip-forward"
+                size={24}
+                onPress={next}
+                color={colors.icon}
+                colors={colors}
+                wide
+              />
 
-              <Pressable
+              <TransportButton
+                icon="repeat"
+                size={18}
                 onPress={cycleRepeat}
-                hitSlop={8}
-                style={styles.smallBtn}
+                color={
+                  repeatMode !== 'off' ? colors.primary : colors.iconMuted
+                }
+                colors={colors}
               >
-                <Feather
-                  name="repeat"
-                  size={18}
-                  color={
-                    repeatMode !== 'off' ? colors.primary : colors.iconMuted
-                  }
-                />
                 {repeatMode === 'one' && (
                   <View
                     style={[
@@ -278,34 +259,14 @@ export default function NowPlayingAside() {
                     <Text style={styles.repeatBadgeText}>1</Text>
                   </View>
                 )}
-              </Pressable>
+              </TransportButton>
             </View>
 
-            <Pressable
+            <FullPlayerButton
               onPress={() => router.push('/player')}
-              style={({ pressed }) => [
-                styles.openFullBtn,
-                {
-                  borderColor: colors.border,
-                  borderRadius: design.radius.item,
-                },
-                pressed && { opacity: 0.7 },
-              ]}
-            >
-              <Feather
-                name="maximize-2"
-                size={16}
-                color={colors.textSecondary}
-              />
-              <Text
-                style={[
-                  design.type.caption,
-                  { color: colors.textSecondary, fontWeight: '600' },
-                ]}
-              >
-                Open full player
-              </Text>
-            </Pressable>
+              colors={colors}
+              design={design}
+            />
 
             {/* ── Up next ─────────────────────────────── */}
             {upNext.length > 0 && (
@@ -325,93 +286,21 @@ export default function NowPlayingAside() {
                 </Text>
 
                 {upNext.map((song, idx) => (
-                  <Pressable
+                  <UpNextRow
                     key={`${song.id}-${idx}`}
+                    song={song}
                     onPress={() => jumpToUpNext(idx)}
-                    style={({ pressed }) => [
-                      styles.upNextRow,
-                      pressed && { opacity: 0.6 },
-                    ]}
-                  >
-                    {song.artwork ? (
-                      <Image
-                        source={{ uri: song.artwork }}
-                        style={[
-                          styles.upNextArt,
-                          {
-                            borderRadius: design.radius.item - 4,
-                            backgroundColor: colors.artPlaceholder,
-                          },
-                        ]}
-                      />
-                    ) : (
-                      <View
-                        style={[
-                          styles.upNextArt,
-                          {
-                            borderRadius: design.radius.item - 4,
-                            backgroundColor: colors.artPlaceholder,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          },
-                        ]}
-                      >
-                        <Feather
-                          name="music"
-                          size={14}
-                          color={colors.iconMuted}
-                        />
-                      </View>
-                    )}
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text
-                        numberOfLines={1}
-                        style={[
-                          design.type.caption,
-                          {
-                            color: colors.text,
-                            fontWeight: '600',
-                            fontSize: 13,
-                          },
-                        ]}
-                      >
-                        {song.title}
-                      </Text>
-                      <Text
-                        numberOfLines={1}
-                        style={[
-                          design.type.caption,
-                          { color: colors.textMuted, marginTop: 1 },
-                        ]}
-                      >
-                        {song.artist}
-                      </Text>
-                    </View>
-                  </Pressable>
+                    colors={colors}
+                    design={design}
+                  />
                 ))}
 
-                {queue.length > UP_NEXT_PREVIEW + 1 && (
-                  <Pressable
+                {hasMoreAfterPreview && (
+                  <SeeQueueLink
                     onPress={() => setQueueOpen(true)}
-                    style={({ pressed }) => [
-                      styles.seeQueueBtn,
-                      pressed && { opacity: 0.6 },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        design.type.caption,
-                        { color: colors.primary, fontWeight: '600' },
-                      ]}
-                    >
-                      See full queue
-                    </Text>
-                    <Feather
-                      name="chevron-right"
-                      size={14}
-                      color={colors.primary}
-                    />
-                  </Pressable>
+                    colors={colors}
+                    design={design}
+                  />
                 )}
               </View>
             )}
@@ -458,6 +347,250 @@ export default function NowPlayingAside() {
   );
 }
 
+// ── Transport button ────────────────────────────────────
+// Small icon buttons: shuffle, prev, next, repeat. Each holds
+// its own hover state, so this has to be its own component —
+// calling useHover four times inline in NowPlayingAside would
+// be legal but ugly.
+function TransportButton({
+  icon,
+  size,
+  onPress,
+  color,
+  colors,
+  wide,
+  children,
+}: {
+  icon: React.ComponentProps<typeof Feather>['name'];
+  size: number;
+  onPress: () => void;
+  color: string;
+  colors: any;
+  wide?: boolean;
+  children?: React.ReactNode;
+}) {
+  const { hovered, hoverProps } = useHover();
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      hitSlop={8}
+      style={[
+        wide ? styles.ctrlBtn : styles.smallBtn,
+        hovered && { backgroundColor: colors.surfaceElevated },
+      ]}
+    >
+      <Feather name={icon} size={size} color={color} />
+      {children}
+    </Pressable>
+  );
+}
+
+// ── Play / pause button ─────────────────────────────────
+function PlayPauseButton({
+  isPlaying,
+  onPress,
+  colors,
+}: {
+  isPlaying: boolean;
+  onPress: () => void;
+  colors: any;
+}) {
+  const { hovered, hoverProps } = useHover();
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      hitSlop={6}
+      style={[
+        styles.playBtn,
+        { backgroundColor: colors.primary },
+        hovered && { opacity: 0.9 },
+      ]}
+    >
+      <Feather
+        name={isPlaying ? 'pause' : 'play'}
+        size={26}
+        color={colors.primaryText}
+        style={{ marginLeft: isPlaying ? 0 : 3 }}
+      />
+    </Pressable>
+  );
+}
+
+// ── Menu (3-dot) button ─────────────────────────────────
+function MenuButton({
+  onPress,
+  colors,
+}: {
+  onPress: () => void;
+  colors: any;
+}) {
+  const { hovered, hoverProps } = useHover();
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      hitSlop={10}
+      style={[
+        styles.menuBtn,
+        hovered && { backgroundColor: colors.surfaceElevated },
+      ]}
+    >
+      <Feather name="more-vertical" size={20} color={colors.iconMuted} />
+    </Pressable>
+  );
+}
+
+// ── Full player button ──────────────────────────────────
+function FullPlayerButton({
+  onPress,
+  colors,
+  design,
+}: {
+  onPress: () => void;
+  colors: any;
+  design: any;
+}) {
+  const { hovered, hoverProps } = useHover();
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.openFullBtn,
+        {
+          borderColor: colors.border,
+          borderRadius: design.radius.item,
+        },
+        hovered && { backgroundColor: colors.surfaceElevated },
+        pressed && { opacity: 0.7 },
+      ]}
+    >
+      <Feather name="maximize-2" size={16} color={colors.textSecondary} />
+      <Text
+        style={[
+          design.type.caption,
+          { color: colors.textSecondary, fontWeight: '600' },
+        ]}
+      >
+        Open full player
+      </Text>
+    </Pressable>
+  );
+}
+
+// ── Up-next row ─────────────────────────────────────────
+function UpNextRow({
+  song,
+  onPress,
+  colors,
+  design,
+}: {
+  song: Song;
+  onPress: () => void;
+  colors: any;
+  design: any;
+}) {
+  const { hovered, hoverProps } = useHover();
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      style={[
+        styles.upNextRow,
+        hovered && { backgroundColor: colors.surfaceElevated },
+      ]}
+    >
+      {song.artwork ? (
+        <Image
+          source={{ uri: song.artwork }}
+          style={[
+            styles.upNextArt,
+            {
+              borderRadius: design.radius.item - 4,
+              backgroundColor: colors.artPlaceholder,
+            },
+          ]}
+        />
+      ) : (
+        <View
+          style={[
+            styles.upNextArt,
+            {
+              borderRadius: design.radius.item - 4,
+              backgroundColor: colors.artPlaceholder,
+              alignItems: 'center',
+              justifyContent: 'center',
+            },
+          ]}
+        >
+          <Feather name="music" size={14} color={colors.iconMuted} />
+        </View>
+      )}
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text
+          numberOfLines={1}
+          style={[
+            design.type.caption,
+            { color: colors.text, fontWeight: '600', fontSize: 13 },
+          ]}
+        >
+          {song.title}
+        </Text>
+        <Text
+          numberOfLines={1}
+          style={[
+            design.type.caption,
+            { color: colors.textMuted, marginTop: 1 },
+          ]}
+        >
+          {song.artist}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+// ── See full queue link ─────────────────────────────────
+function SeeQueueLink({
+  onPress,
+  colors,
+  design,
+}: {
+  onPress: () => void;
+  colors: any;
+  design: any;
+}) {
+  const { hovered, hoverProps } = useHover();
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      style={[
+        styles.seeQueueBtn,
+        hovered && { backgroundColor: colors.surfaceElevated },
+      ]}
+    >
+      <Text
+        style={[
+          design.type.caption,
+          { color: colors.primary, fontWeight: '600' },
+        ]}
+      >
+        See full queue
+      </Text>
+      <Feather name="chevron-right" size={14} color={colors.primary} />
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   root: {
     width: ASIDE_WIDTH,
@@ -487,6 +620,7 @@ const styles = StyleSheet.create({
   menuBtn: {
     width: 28,
     height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -509,12 +643,14 @@ const styles = StyleSheet.create({
   smallBtn: {
     width: 36,
     height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
   ctrlBtn: {
     width: 44,
     height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -561,6 +697,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 24,
     paddingVertical: 8,
+    borderRadius: 10,
   },
   upNextArt: {
     width: 36,
@@ -571,9 +708,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
-    paddingHorizontal: 24,
-    paddingTop: 10,
-    paddingBottom: 4,
+    marginHorizontal: 16,
+    marginTop: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderRadius: 10,
   },
   empty: {
     flex: 1,
