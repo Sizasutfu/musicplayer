@@ -1,5 +1,5 @@
 // hooks/useTabBarHeight.ts
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useBottomTabBarHeight } from "expo-router/js-tabs";
 
 /**
  * Returns the actual rendered tab bar height, as measured by React

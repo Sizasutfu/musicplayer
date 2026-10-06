@@ -12,7 +12,9 @@
       "bundleIdentifier": "com.sizacode.MusicPlayer",
       "supportsTablet": true,
       "infoPlist": {
-        "UIBackgroundModes": ["audio"]
+        "UIBackgroundModes": [
+          "audio"
+        ]
       }
     },
     "android": {
@@ -23,7 +25,7 @@
         "backgroundImage": "./assets/images/adaptive-background.png",
         "monochromeImage": "./assets/images/adaptive-monochrome.png"
       },
-      "edgeToEdgeEnabled": true,
+      
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.READ_MEDIA_AUDIO",
@@ -64,7 +66,10 @@
           "photosPermission": "Allow $(PRODUCT_NAME) to access your photos so you can set a profile picture.",
           "savePhotosPermission": "Allow $(PRODUCT_NAME) to save photos.",
           "isAccessMediaLocationEnabled": false,
-          "granularPermissions": ["audio", "photo"]
+          "granularPermissions": [
+            "audio",
+            "photo"
+          ]
         }
       ],
       [
@@ -73,7 +78,12 @@
           "enableBackgroundPlayback": true
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "expo-build-properties",
+      "expo-font",
+      "expo-image",
+      "expo-status-bar",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
