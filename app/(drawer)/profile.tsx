@@ -10,7 +10,6 @@ import {
   Alert,
   Modal,
   KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
   Linking,
 } from 'react-native';
@@ -66,8 +65,6 @@ export default function ProfileScreen() {
 
   // ── Avatar handling ────────────────────────────────────
   const handlePickAvatar = async () => {
-    // Permission first. The OS prompt only shows on the very
-    // first request; afterwards it returns the cached answer.
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
       Alert.alert(
@@ -86,8 +83,6 @@ export default function ProfileScreen() {
       return;
     }
 
-    // Launch the OS picker. `allowsEditing` gives a 1:1 crop UI
-    // so the avatar is square, and `quality` keeps the file small.
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
@@ -102,9 +97,6 @@ export default function ProfileScreen() {
 
     try {
       const persisted = await persistAvatar(sourceUri);
-      // Delete the old file only after the new one is safely
-      // copied, so a failed copy can never leave us with no
-      // avatar at all.
       await deleteAvatarFile(profile.avatarUri);
       update('avatarUri', persisted);
     } catch (e) {
@@ -170,6 +162,7 @@ export default function ProfileScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         <View
           style={[
@@ -374,96 +367,115 @@ export default function ProfileScreen() {
         animationType="fade"
         onRequestClose={() => setEditField(null)}
       >
+        {/* `padding` on both platforms. Android's old `undefined`
+            behaviour meant the card sat still while the keyboard
+            covered the Save and Cancel buttons. iOS padding was
+            already correct; unifying the two keeps behaviour
+            predictable. */}
         <KeyboardAvoidingView
           style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior="padding"
         >
           <Pressable
             style={styles.modalBackdrop}
             onPress={() => setEditField(null)}
           />
-          <View
-            style={[
-              design.card,
-              styles.modalCard,
-              { backgroundColor: colors.surface },
-            ]}
+
+          {/* ScrollView so the card can shift up when the keyboard
+              covers the lower half of the screen without squashing
+              the input. `keyboardShouldPersistTaps` keeps the Save
+              tap working while the keyboard is up. */}
+          <ScrollView
+            contentContainerStyle={styles.modalScrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            bounces={false}
           >
-            <Text
+            <View
               style={[
-                design.type.heading,
-                { color: colors.text, marginBottom: 12 },
+                design.card,
+                styles.modalCard,
+                { backgroundColor: colors.surface },
               ]}
             >
-              {editField === 'name' && 'Display name'}
-              {editField === 'username' && 'Username'}
-              {editField === 'bio' && 'Bio'}
-            </Text>
-
-            <TextInput
-              autoFocus
-              value={draft}
-              onChangeText={setDraft}
-              placeholder={
-                editField === 'name'
-                  ? 'Your name'
-                  : editField === 'username'
-                  ? 'username'
-                  : 'Say something short…'
-              }
-              placeholderTextColor={colors.textMuted}
-              style={[
-                styles.modalInput,
-                {
-                  backgroundColor: colors.surfaceElevated,
-                  color: colors.text,
-                  borderColor: colors.border,
-                  borderRadius: design.radius.item,
-                },
-                editField === 'bio' && {
-                  minHeight: 90,
-                  textAlignVertical: 'top',
-                },
-              ]}
-              maxLength={editField === 'bio' ? 140 : 40}
-              multiline={editField === 'bio'}
-              returnKeyType={editField === 'bio' ? 'default' : 'done'}
-              onSubmitEditing={editField === 'bio' ? undefined : submitEdit}
-            />
-
-            <View style={styles.modalActions}>
-              <Pressable
-                onPress={() => setEditField(null)}
+              <Text
                 style={[
-                  styles.modalBtn,
-                  {
-                    backgroundColor: colors.chipBg,
-                    borderRadius: design.radius.item,
-                  },
+                  design.type.heading,
+                  { color: colors.text, marginBottom: 12 },
                 ]}
               >
-                <Text style={[design.type.body, { color: colors.text }]}>
-                  Cancel
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={submitEdit}
+                {editField === 'name' && 'Display name'}
+                {editField === 'username' && 'Username'}
+                {editField === 'bio' && 'Bio'}
+              </Text>
+
+              <TextInput
+                autoFocus
+                value={draft}
+                onChangeText={setDraft}
+                placeholder={
+                  editField === 'name'
+                    ? 'Your name'
+                    : editField === 'username'
+                    ? 'username'
+                    : 'Say something short…'
+                }
+                placeholderTextColor={colors.textMuted}
                 style={[
-                  styles.modalBtn,
+                  styles.modalInput,
                   {
-                    backgroundColor: colors.primary,
+                    backgroundColor: colors.surfaceElevated,
+                    color: colors.text,
+                    borderColor: colors.border,
                     borderRadius: design.radius.item,
                   },
+                  editField === 'bio' && {
+                    minHeight: 90,
+                    textAlignVertical: 'top',
+                  },
                 ]}
-              >
-                <Text
-                  style={[design.type.body, { color: colors.primaryText }]}
+                maxLength={editField === 'bio' ? 140 : 40}
+                multiline={editField === 'bio'}
+                returnKeyType={editField === 'bio' ? 'default' : 'done'}
+                onSubmitEditing={
+                  editField === 'bio' ? undefined : submitEdit
+                }
+              />
+
+              <View style={styles.modalActions}>
+                <Pressable
+                  onPress={() => setEditField(null)}
+                  style={[
+                    styles.modalBtn,
+                    {
+                      backgroundColor: colors.chipBg,
+                      borderRadius: design.radius.item,
+                    },
+                  ]}
                 >
-                  Save
-                </Text>
-              </Pressable>
+                  <Text style={[design.type.body, { color: colors.text }]}>
+                    Cancel
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={submitEdit}
+                  style={[
+                    styles.modalBtn,
+                    {
+                      backgroundColor: colors.primary,
+                      borderRadius: design.radius.item,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[design.type.body, { color: colors.primaryText }]}
+                  >
+                    Save
+                  </Text>
+                </Pressable>
+              </View>
             </View>
-          </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
 
@@ -522,10 +534,7 @@ function Stat({
   return (
     <View style={styles.stat}>
       <View
-        style={[
-          styles.statIcon,
-          { backgroundColor: colors.rowActive },
-        ]}
+        style={[styles.statIcon, { backgroundColor: colors.rowActive }]}
       >
         <Feather name={icon} size={20} color={colors.primary} />
       </View>
@@ -745,10 +754,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
+  // ── Edit modal ───────────────────────────────────────
   modalOverlay: {
     flex: 1,
+  },
+  modalScrollContent: {
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 40,
   },
   modalBackdrop: {
     position: 'absolute',
@@ -759,7 +774,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalCard: {
-    width: '86%',
+    width: '100%',
     maxWidth: 420,
     padding: 22,
   },
