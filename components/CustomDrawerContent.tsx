@@ -4,6 +4,7 @@ import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import type { DrawerContentComponentProps } from 'expo-router/drawer';
+import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useTheme } from '../context/ThemeContext';
 import { useProfile } from '../hooks/useProfile';
@@ -101,6 +102,7 @@ export default function CustomDrawerContent(
         <ProfileAvatar
           name={profile.name}
           color={profile.avatarColor}
+          uri={profile.avatarUri}
           size={52}
         />
         <View style={{ flex: 1 }}>
@@ -171,7 +173,7 @@ export default function CustomDrawerContent(
             { color: colors.textMuted, fontSize: 11 },
           ]}
         >
-          v1.0.0
+          v{Constants.expoConfig?.version ?? '—'}
         </Text>
       </View>
     </SafeAreaView>
