@@ -76,9 +76,9 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
       setGranted(true);
 
       const { assets } = await MediaLibrary.getAssetsAsync({
-        mediaType: MediaLibrary.MediaType.audio,
+        mediaType: MediaLibrary.MediaType.AUDIO,
         first: 1000,
-        sortBy: [MediaLibrary.SortBy.default],
+        sortBy: ['default'],
       });
 
       // Step 1: fast list from filename + duration
@@ -98,21 +98,33 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
       setEnriching(true);
 
-      // Step 2: apply cached metadata first
+      // Step 2: apply cached metadata first, recording which IDs
+      // hit the cache. The cache is keyed on the MediaLibrary asset
+      // ID, which is stable across sessions and independent of any
+      // URI churn.
+      const cachedIds = new Set<string>();
       const withCache: Song[] = await Promise.all(
         fast.map(async (s) => {
-          const cached = await getCached(s.url);
-          return cached ? { ...s, ...cached } : s;
+          const cached = await getCached(s.id);
+          if (cached) {
+            cachedIds.add(s.id);
+            return { ...s, ...cached };
+          }
+          return s;
         })
       );
 
       if (cancelled.current) return;
       setAllSongs(withCache);
 
-      // Step 3: extract ID3 tags for uncached tracks, one at a time
-      const uncached = withCache.filter(
-        (s) => !s.artwork && s.artist === 'Unknown Artist'
-      );
+      // Step 3: extract ID3 tags for tracks that were NOT in the
+      // cache. A track that was cached is trusted as-is — even if
+      // its metadata looks empty, because we already tried once and
+      // there's nothing more to read. This is what prevents the
+      // "reads tags every launch" loop: a file with no artist tag
+      // and no artwork gets cached with `Unknown Artist` and never
+      // re-read.
+      const uncached = withCache.filter((s) => !cachedIds.has(s.id));
 
       for (const song of uncached) {
         if (cancelled.current) return;
@@ -120,7 +132,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
         const tags = await readTags(song.url);
         const merged = mergeMetadata(song.filename, tags);
 
-        await setCached(song.url, merged);
+        await setCached(song.id, merged);
 
         if (cancelled.current) return;
         setAllSongs((prev) =>

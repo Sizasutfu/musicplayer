@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -194,89 +195,109 @@ export default function PlaylistsScreen() {
         animationType="fade"
         onRequestClose={() => setCreateOpen(false)}
       >
+        {/* `padding` on both platforms. Android's old `undefined`
+            behaviour meant the card sat still while the keyboard
+            covered the Create button. iOS padding was already
+            correct; unifying the two keeps behaviour predictable. */}
         <KeyboardAvoidingView
           style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior="padding"
         >
           <Pressable
             style={styles.modalBackdrop}
             onPress={() => setCreateOpen(false)}
           />
-          <View
-            style={[
-              design.card,
-              styles.modalCard,
-              { backgroundColor: colors.surface },
-            ]}
+
+          {/* ScrollView so the card can shift up when the keyboard
+              covers the lower half of the screen without squashing
+              the input. `keyboardShouldPersistTaps` keeps the
+              Create tap working while the keyboard is up. */}
+          <ScrollView
+            contentContainerStyle={styles.modalScrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            bounces={false}
           >
-            <Text style={[design.type.heading, { color: colors.text }]}>
-              New Playlist
-            </Text>
-            <Text
+            <View
               style={[
-                design.type.caption,
-                { color: colors.textSecondary, marginTop: 4, marginBottom: 16 },
+                design.card,
+                styles.modalCard,
+                { backgroundColor: colors.surface },
               ]}
             >
-              Give it a name to get started.
-            </Text>
-            <TextInput
-              autoFocus
-              value={newName}
-              onChangeText={setNewName}
-              placeholder="Playlist name"
-              placeholderTextColor={colors.textMuted}
-              style={[
-                styles.modalInput,
-                {
-                  backgroundColor: colors.surfaceElevated,
-                  color: colors.text,
-                  borderColor: colors.border,
-                  borderRadius: design.radius.item,
-                },
-              ]}
-              maxLength={60}
-              returnKeyType="done"
-              onSubmitEditing={handleCreate}
-            />
-            <View style={styles.modalActions}>
-              <Pressable
-                onPress={() => {
-                  setCreateOpen(false);
-                  setNewName('');
-                }}
+              <Text style={[design.type.heading, { color: colors.text }]}>
+                New Playlist
+              </Text>
+              <Text
                 style={[
-                  styles.modalBtn,
+                  design.type.caption,
                   {
-                    backgroundColor: colors.chipBg,
-                    borderRadius: design.radius.item,
+                    color: colors.textSecondary,
+                    marginTop: 4,
+                    marginBottom: 16,
                   },
                 ]}
               >
-                <Text style={[design.type.body, { color: colors.text }]}>
-                  Cancel
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={handleCreate}
-                disabled={!newName.trim()}
+                Give it a name to get started.
+              </Text>
+              <TextInput
+                autoFocus
+                value={newName}
+                onChangeText={setNewName}
+                placeholder="Playlist name"
+                placeholderTextColor={colors.textMuted}
                 style={[
-                  styles.modalBtn,
+                  styles.modalInput,
                   {
-                    backgroundColor: colors.primary,
+                    backgroundColor: colors.surfaceElevated,
+                    color: colors.text,
+                    borderColor: colors.border,
                     borderRadius: design.radius.item,
                   },
-                  !newName.trim() && { opacity: 0.5 },
                 ]}
-              >
-                <Text
-                  style={[design.type.body, { color: colors.primaryText }]}
+                maxLength={60}
+                returnKeyType="done"
+                onSubmitEditing={handleCreate}
+              />
+              <View style={styles.modalActions}>
+                <Pressable
+                  onPress={() => {
+                    setCreateOpen(false);
+                    setNewName('');
+                  }}
+                  style={[
+                    styles.modalBtn,
+                    {
+                      backgroundColor: colors.chipBg,
+                      borderRadius: design.radius.item,
+                    },
+                  ]}
                 >
-                  Create
-                </Text>
-              </Pressable>
+                  <Text style={[design.type.body, { color: colors.text }]}>
+                    Cancel
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={handleCreate}
+                  disabled={!newName.trim()}
+                  style={[
+                    styles.modalBtn,
+                    {
+                      backgroundColor: colors.primary,
+                      borderRadius: design.radius.item,
+                    },
+                    !newName.trim() && { opacity: 0.5 },
+                  ]}
+                >
+                  <Text
+                    style={[design.type.body, { color: colors.primaryText }]}
+                  >
+                    Create
+                  </Text>
+                </Pressable>
+              </View>
             </View>
-          </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
 
@@ -320,17 +341,32 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 6,
   },
+
+  // ── Create modal ─────────────────────────────────────
   modalOverlay: {
     flex: 1,
+  },
+  // Scroll content is a full-height flex that centers its child
+  // horizontally and vertically, then lets the child flow to the
+  // top if the keyboard shrinks the visible area. `paddingVertical`
+  // gives the card room on small screens with tall keyboards.
+  modalScrollContent: {
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 40,
   },
   modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+   position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalCard: {
-    width: '86%',
+    width: '100%',
     maxWidth: 420,
     padding: 22,
   },
