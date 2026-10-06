@@ -5,41 +5,73 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import type { DrawerContentComponentProps } from 'expo-router/drawer';
 import Constants from 'expo-constants';
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 import { useTheme } from '../context/ThemeContext';
 import { useProfile } from '../hooks/useProfile';
 import ProfileAvatar from './ProfileAvatar';
 
 type Item = {
-  key: string;
   label: string;
   icon: React.ComponentProps<typeof Feather>['name'];
+  /** URL-form route. Matches what usePathname() returns. */
   route: string;
+  /** Also match these prefix paths for active highlighting. */
+  matchPrefix?: string;
 };
 
 const PRIMARY: Item[] = [
-  { key: 'index', label: 'Library', icon: 'music', route: '/(drawer)/(tabs)' },
-  { key: 'playlists', label: 'Playlists', icon: 'list', route: '/(drawer)/(tabs)/playlists' },
-  { key: 'favorites', label: 'Favorites', icon: 'heart', route: '/(drawer)/(tabs)/favorites' },
-  { key: 'settings', label: 'Settings', icon: 'settings', route: '/(drawer)/(tabs)/settings' },
+  { label: 'Home', icon: 'home', route: '/(drawer)/(tabs)' },
+  { label: 'Library', icon: 'music', route: '/(drawer)/(tabs)/library' },
+  {
+    label: 'Playlists',
+    icon: 'list',
+    route: '/(drawer)/(tabs)/playlists',
+  },
+  {
+    label: 'Favorites',
+    icon: 'heart',
+    route: '/(drawer)/(tabs)/favorites',
+  },
+  {
+    label: 'Settings',
+    icon: 'settings',
+    route: '/(drawer)/(tabs)/settings',
+  },
 ];
 
 const BROWSE: Item[] = [
-  { key: 'circle', label: 'Circle', icon: 'radio', route: '/(drawer)/circle' },
-  { key: 'albums', label: 'Albums', icon: 'disc', route: '/(drawer)/albums' },
-  { key: 'artists', label: 'Artists', icon: 'user', route: '/(drawer)/artists' },
-  { key: 'profile', label: 'Profile', icon: 'user-check', route: '/(drawer)/profile' },
+  { label: 'Circle', icon: 'radio', route: '/(drawer)/circle' },
+  { label: 'Albums', icon: 'disc', route: '/(drawer)/albums' },
+  { label: 'Artists', icon: 'user', route: '/(drawer)/artists' },
+  { label: 'Profile', icon: 'user-check', route: '/(drawer)/profile' },
 ];
+
+/**
+ * Convert an expo-router file-system path to the URL form that
+ * usePathname() returns.
+ *   /(drawer)/(tabs)/library  →  /library
+ *   /(drawer)/(tabs)          →  /
+ *   /(drawer)/circle          →  /circle
+ *
+ * Group segments in parentheses are URL-transparent — they don't
+ * appear in the browser URL and usePathname() strips them.
+ */
+function toUrlPath(route: string): string {
+  const stripped = route.replace(/\/\([^)]+\)/g, '');
+  return stripped === '' ? '/' : stripped;
+}
 
 export default function CustomDrawerContent(
   props: DrawerContentComponentProps
 ) {
   const { colors, design } = useTheme();
   const { profile } = useProfile();
-  const activeRoute = props.state.routeNames[props.state.index];
+  const pathname = usePathname();
 
   const goToProfile = () => {
     router.push('/(drawer)/profile');
+    // With a permanent drawer on wide screens, closeDrawer is a
+    // no-op. Fine to call unconditionally.
     props.navigation.closeDrawer();
   };
 
@@ -48,11 +80,26 @@ export default function CustomDrawerContent(
     props.navigation.closeDrawer();
   };
 
+  const isActive = (item: Item) => {
+    const urlPath = toUrlPath(item.route);
+
+    // Home matches only the exact root — otherwise every route
+    // "starts with /" and Home would always be highlighted.
+    if (urlPath === '/') {
+      return pathname === '/' || pathname === '';
+    }
+
+    // Everything else matches itself or a nested path underneath
+    // (e.g., /playlist/123 still highlights /playlists via the
+    // matchPrefix override if you add one).
+    return pathname === urlPath || pathname.startsWith(urlPath + '/');
+  };
+
   const renderItem = (item: Item) => {
-    const active = activeRoute === item.key;
+    const active = isActive(item);
     return (
       <Pressable
-        key={item.key}
+        key={item.route}
         onPress={() => go(item.route)}
         style={({ pressed }) => [
           styles.row,
