@@ -12,10 +12,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import { useProfile } from '../../hooks/useProfile';
 import { usePlaylists } from '../../hooks/usePlaylists';
 import { useLibrary } from '../../hooks/useLibrary';
@@ -27,7 +29,6 @@ import {
   persistAvatar,
 } from '../../lib/profile';
 import ProfileAvatar from '../../components/ProfileAvatar';
-import PhotoPickerModal from '../../components/PhotoPickerModal';
 import MiniPlayer from '../../components/MiniPlayer';
 
 type Colors = ReturnType<typeof useTheme>['colors'];
@@ -44,7 +45,6 @@ export default function ProfileScreen() {
 
   const [editField, setEditField] = useState<EditField>(null);
   const [draft, setDraft] = useState('');
-  const [pickerVisible, setPickerVisible] = useState(false);
 
   useHeaderBack('Profile');
 
@@ -65,11 +65,46 @@ export default function ProfileScreen() {
   };
 
   // ── Avatar handling ────────────────────────────────────
-  const handlePickAvatar = async (sourceUri: string) => {
+  const handlePickAvatar = async () => {
+    // Permission first. The OS prompt only shows on the very
+    // first request; afterwards it returns the cached answer.
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert(
+        'Photos permission needed',
+        'Allow access to your photos to set a profile picture.',
+        perm.canAskAgain
+          ? undefined
+          : [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Open settings',
+                onPress: () => Linking.openSettings(),
+              },
+            ]
+      );
+      return;
+    }
+
+    // Launch the OS picker. `allowsEditing` gives a 1:1 crop UI
+    // so the avatar is square, and `quality` keeps the file small.
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (result.canceled) return;
+
+    const sourceUri = result.assets[0]?.uri;
+    if (!sourceUri) return;
+
     try {
       const persisted = await persistAvatar(sourceUri);
-      // Only delete the old file after the new one is safely copied,
-      // so a failed copy can never leave us with no avatar at all.
+      // Delete the old file only after the new one is safely
+      // copied, so a failed copy can never leave us with no
+      // avatar at all.
       await deleteAvatarFile(profile.avatarUri);
       update('avatarUri', persisted);
     } catch (e) {
@@ -85,7 +120,7 @@ export default function ProfileScreen() {
 
   const openAvatarMenu = () => {
     const buttons: Parameters<typeof Alert.alert>[2] = [
-      { text: 'Choose from library', onPress: () => setPickerVisible(true) },
+      { text: 'Choose from library', onPress: handlePickAvatar },
     ];
     if (profile.avatarUri) {
       buttons.push({
@@ -432,12 +467,6 @@ export default function ProfileScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      <PhotoPickerModal
-        visible={pickerVisible}
-        onClose={() => setPickerVisible(false)}
-        onPick={handlePickAvatar}
-      />
-
       <MiniPlayer />
     </SafeAreaView>
   );
@@ -722,7 +751,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalCard: {
