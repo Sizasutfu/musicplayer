@@ -34,6 +34,10 @@ import SongActionSheet from '../../../components/SongActionSheet';
 
 const CONTENT_MAX_WIDTH = 900;
 
+// At this width the search field is permanent — no toggle. Below
+// it, search is a mode (icon → open → back arrow → close).
+const PERMANENT_SEARCH_BREAKPOINT = 900;
+
 type SortMode = 'title' | 'artist' | 'album';
 type Source = 'device' | 'circle';
 
@@ -43,7 +47,6 @@ const SORTS: { key: SortMode; label: string }[] = [
   { key: 'album', label: 'Album' },
 ];
 
-// ── Responsive sizing ──────────────────────────────────
 type Layout = {
   hPad: number;
   artSize: number;
@@ -74,6 +77,10 @@ export default function LibraryScreen() {
   const isWide = width >= 900;
   const L = useMemo(() => layoutFor(width), [width]);
 
+  // Wide screens get a permanent search field. Phones keep the
+  // toggle behavior.
+  const searchPermanent = width >= PERMANENT_SEARCH_BREAKPOINT;
+
   const [source, setSource] = useState<Source>('device');
   const isCircle = !isWeb && source === 'circle';
   const circle = useCircleTracks(isCircle);
@@ -84,10 +91,6 @@ export default function LibraryScreen() {
   const [actionSong, setActionSong] = useState<Song | null>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const inputRef = useRef<TextInput>(null);
-
-  // Search icon button gets its own hover state; the rest live in
-  // extracted chip components below.
-  const searchBtnHover = useHover();
 
   useLayoutEffect(() => {
     navigation.setOptions({ headerShown: false });
@@ -106,7 +109,6 @@ export default function LibraryScreen() {
     };
   }, []);
 
-  const openSearch = () => setSearchOpen(true);
   const closeSearch = () => {
     setSearchOpen(false);
     setQuery('');
@@ -283,6 +285,13 @@ export default function LibraryScreen() {
 
   const showEnriching = !isWeb && !isCircle && enriching;
 
+  // ── Visibility rules ────────────────────────────────────
+  // Wide: title row + search bar both visible at the same time.
+  // Phone: title row when closed, search bar when open. Tapping
+  // the search icon swaps between them.
+  const showTitleRow = searchPermanent || !searchOpen;
+  const showSearchBar = searchPermanent || searchOpen;
+
   return (
     <SafeAreaView
       style={[styles.root, { backgroundColor: colors.background }]}
@@ -295,59 +304,9 @@ export default function LibraryScreen() {
           alignSelf: 'center',
         }}
       >
-        {searchOpen ? (
-          <View
-            style={[styles.searchBar, { paddingHorizontal: L.hPad - 8 }]}
-          >
-            <Pressable
-              onPress={closeSearch}
-              hitSlop={10}
-              style={styles.iconBtn}
-            >
-              <Feather
-                name="arrow-left"
-                size={L.iconSize + 2}
-                color={colors.icon}
-              />
-            </Pressable>
-            <View
-              style={[
-                styles.searchField,
-                {
-                  backgroundColor: colors.chipBg,
-                  borderRadius: design.radius.pill,
-                },
-              ]}
-            >
-              <Feather
-                name="search"
-                size={16}
-                color={colors.iconMuted}
-                style={{ marginRight: 8 }}
-              />
-              <TextInput
-                ref={inputRef}
-                autoFocus
-                value={query}
-                onChangeText={setQuery}
-                placeholder="Songs, artists, albums"
-                placeholderTextColor={colors.textMuted}
-                style={[styles.searchInput, { color: colors.text }]}
-                returnKeyType="search"
-                autoCorrect={false}
-                autoCapitalize="none"
-              />
-              {query.length > 0 && (
-                <Pressable onPress={() => setQuery('')} hitSlop={8}>
-                  <Feather name="x-circle" size={16} color={colors.iconMuted} />
-                </Pressable>
-              )}
-            </View>
-          </View>
-        ) : (
-          <View
-            style={[styles.titleRow, { paddingHorizontal: L.hPad - 8 }]}
-          >
+        {/* ── Title row ─────────────────────────────── */}
+        {showTitleRow && (
+          <View style={[styles.titleRow, { paddingHorizontal: L.hPad - 8 }]}>
             <BackButton />
             <View style={styles.titleBlock}>
               <Text
@@ -369,26 +328,83 @@ export default function LibraryScreen() {
                 {showEnriching ? ' · reading tags…' : ''}
               </Text>
             </View>
-            <Pressable
-              {...searchBtnHover.hoverProps}
-              onPress={openSearch}
-              hitSlop={10}
+            {/* Search toggle only shows on compact screens, where
+                the field isn't permanently available. */}
+            {!searchPermanent && (
+              <Pressable
+                onPress={() => setSearchOpen(true)}
+                hitSlop={10}
+                style={[
+                  styles.searchIconBtn,
+                  {
+                    backgroundColor: colors.chipBg,
+                    width: L.iconSize + 24,
+                    height: L.iconSize + 24,
+                    borderRadius: (L.iconSize + 24) / 2,
+                  },
+                ]}
+              >
+                <Feather
+                  name="search"
+                  size={L.iconSize}
+                  color={colors.icon}
+                />
+              </Pressable>
+            )}
+          </View>
+        )}
+
+        {/* ── Search bar ────────────────────────────── */}
+        {showSearchBar && (
+          <View style={[styles.searchBar, { paddingHorizontal: L.hPad }]}>
+            {/* The back arrow only makes sense when the search is
+                a dismissible mode (compact screens). */}
+            {!searchPermanent && (
+              <Pressable
+                onPress={closeSearch}
+                hitSlop={10}
+                style={styles.searchBackBtn}
+              >
+                <Feather name="arrow-left" size={22} color={colors.icon} />
+              </Pressable>
+            )}
+            <View
               style={[
-                styles.searchIconBtn,
+                styles.searchField,
                 {
                   backgroundColor: colors.chipBg,
-                  width: L.iconSize + 24,
-                  height: L.iconSize + 24,
-                  borderRadius: (L.iconSize + 24) / 2,
+                  borderRadius: design.radius.pill,
                 },
-                isWeb &&
-                  searchBtnHover.hovered && {
-                    backgroundColor: colors.surfaceElevated,
-                  },
               ]}
             >
-              <Feather name="search" size={L.iconSize} color={colors.icon} />
-            </Pressable>
+              <Feather
+                name="search"
+                size={16}
+                color={colors.iconMuted}
+                style={{ marginRight: 8 }}
+              />
+              <TextInput
+                ref={inputRef}
+                autoFocus={!searchPermanent && searchOpen}
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Songs, artists, albums"
+                placeholderTextColor={colors.textMuted}
+                style={[styles.searchInput, { color: colors.text }]}
+                returnKeyType="search"
+                autoCorrect={false}
+                autoCapitalize="none"
+              />
+              {query.length > 0 && (
+                <Pressable onPress={() => setQuery('')} hitSlop={8}>
+                  <Feather
+                    name="x-circle"
+                    size={16}
+                    color={colors.iconMuted}
+                  />
+                </Pressable>
+              )}
+            </View>
           </View>
         )}
       </View>
@@ -414,6 +430,7 @@ export default function LibraryScreen() {
           contentContainerStyle={{ paddingBottom: 200 + keyboardHeight }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
           initialNumToRender={20}
           windowSize={10}
           removeClippedSubviews
@@ -813,9 +830,8 @@ const styles = StyleSheet.create({
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingTop: 8,
-    paddingBottom: 12,
+    paddingBottom: 8,
   },
   titleBlock: {
     flex: 1,
@@ -835,11 +851,10 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 8,
     paddingBottom: 12,
     gap: 4,
   },
-  iconBtn: {
+  searchBackBtn: {
     width: 40,
     height: 40,
     alignItems: 'center',
