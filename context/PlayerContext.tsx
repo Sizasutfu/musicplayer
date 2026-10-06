@@ -35,6 +35,10 @@ type PlayerContextValue = {
   progress: { position: number; duration: number; buffered: number };
   playTrack: (track: Song, queue?: Song[]) => Promise<void>;
   playQueue: (queue: Song[], startIndex?: number) => Promise<void>;
+  /** Insert a song immediately after the current track. */
+  playNext: (song: Song) => void;
+  /** Append a song to the end of the queue. */
+  addToQueue: (song: Song) => void;
   togglePlayPause: () => Promise<void>;
   next: () => Promise<void>;
   previous: () => Promise<void>;
@@ -451,6 +455,62 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     [playQueue]
   );
 
+  // ── Play next ───────────────────────────────────────────
+  // Inserts a song immediately after the currently-playing track.
+  // If nothing is playing, starts a new queue with just this song.
+  const playNext = useCallback(
+    (song: Song) => {
+      if (!queue.length) {
+        startQueue([song], 0);
+        return;
+      }
+
+      const insertAt = queueIndex + 1;
+      setQueue((prev) => {
+        const next = [...prev];
+        next.splice(insertAt, 0, song);
+        return next;
+      });
+
+      // If shuffle is on, splice the new track into the shuffle
+      // order too, keeping it right after the current position
+      // rather than shuffling it somewhere random.
+      if (shuffle && shuffleOrder.length) {
+        const currentPos = shuffleOrder.indexOf(queueIndex);
+        if (currentPos >= 0) {
+          // Every existing index at or after the insertion point
+          // shifts by one to make room.
+          const adjusted = shuffleOrder.map((idx) =>
+            idx >= insertAt ? idx + 1 : idx
+          );
+          adjusted.splice(currentPos + 1, 0, insertAt);
+          setShuffleOrder(adjusted);
+        }
+      }
+    },
+    [queue.length, queueIndex, shuffle, shuffleOrder, startQueue]
+  );
+
+  // ── Add to queue ────────────────────────────────────────
+  // Appends a song to the end of the queue. If nothing is playing,
+  // starts a new queue with just this song.
+  const addToQueue = useCallback(
+    (song: Song) => {
+      if (!queue.length) {
+        startQueue([song], 0);
+        return;
+      }
+
+      const newIndex = queue.length;
+      setQueue((prev) => [...prev, song]);
+
+      if (shuffle && shuffleOrder.length) {
+        setShuffleOrder((prev) => [...prev, newIndex]);
+      }
+    },
+    [queue.length, shuffle, shuffleOrder.length, startQueue]
+  );
+
   const togglePlayPause = useCallback(async () => {
     if (status.playing) player.pause();
     else player.play();
@@ -599,6 +659,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       },
       playTrack,
       playQueue,
+      playNext,
+      addToQueue,
       togglePlayPause,
       next,
       previous,
@@ -621,6 +683,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       status.duration,
       playTrack,
       playQueue,
+      playNext,
+      addToQueue,
       togglePlayPause,
       next,
       previous,

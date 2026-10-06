@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useFavorites } from '../hooks/useFavorites';
+import { usePlayer } from '../context/PlayerContext';
 import type { Song } from '../hooks/useLibrary';
 import AddToPlaylistSheet from './AddToPlaylistSheet';
 
@@ -37,6 +38,7 @@ export default function SongActionSheet({
 }: Props) {
   const { colors, design } = useTheme();
   const { favorites, toggle } = useFavorites();
+  const { playNext, addToQueue } = usePlayer();
   const [playlistOpen, setPlaylistOpen] = useState(false);
 
   const close = () => {
@@ -53,17 +55,21 @@ export default function SongActionSheet({
   };
 
   const handlePlayNext = () => {
+    if (!song) return;
+    playNext(song);
     Alert.alert(
-      'Coming soon',
-      'Play next will work once the real player is wired up.'
+      'Playing next',
+      `"${song.title}" will play after the current track.`
     );
     close();
   };
 
   const handleAddToQueue = () => {
+    if (!song) return;
+    addToQueue(song);
     Alert.alert(
-      'Coming soon',
-      'Add to queue will work once the real player is wired up.'
+      'Added to queue',
+      `"${song.title}" added to the end of the queue.`
     );
     close();
   };
@@ -123,7 +129,9 @@ export default function SongActionSheet({
             {song && (
               <ActionRow
                 icon="heart"
-                label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                label={
+                  isFavorite ? 'Remove from favorites' : 'Add to favorites'
+                }
                 iconFilled={isFavorite}
                 onPress={handleToggleFavorite}
                 colors={colors}
@@ -214,8 +222,6 @@ function ActionRow({
   iconFilled?: boolean;
   last?: boolean;
 }) {
-  // Feather doesn't have a filled heart, so a favorited track uses
-  // the app's primary colour to signal the active state instead.
   const iconColor = destructive
     ? colors.danger
     : iconFilled
@@ -245,11 +251,7 @@ function ActionRow({
           },
         ]}
       >
-        <Feather
-          name={icon}
-          size={18}
-          color={iconColor}
-        />
+        <Feather name={icon} size={18} color={iconColor} />
       </View>
       <Text
         style={[
@@ -273,12 +275,12 @@ function ActionRow({
 const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end' },
   backdrop: {
-   position: 'absolute',
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  backgroundColor: 'rgba(0,0,0,0.5)',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   sheet: {
     borderTopLeftRadius: 20,
