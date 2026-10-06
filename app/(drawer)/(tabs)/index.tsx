@@ -7,6 +7,7 @@ import {
   Pressable,
   StyleSheet,
   Image,
+  Platform,
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,6 +24,11 @@ import { useHover } from '../../../hooks/useHover';
 import MiniPlayer from '../../../components/MiniPlayer';
 
 const CONTENT_MAX_WIDTH = 1200;
+
+// Matches the breakpoint used by the drawer layout. When the
+// drawer is permanent, the hamburger is redundant — the drawer
+// is already on screen.
+const PERMANENT_DRAWER_BREAKPOINT = 900;
 
 function contentPadding(isWide: boolean) {
   return isWide ? 32 : 20;
@@ -51,6 +57,8 @@ export default function HomeScreen() {
   const isCompact = width < 500;
   const isMedium = width >= 500 && width < 900;
   const isWide = width >= 900;
+  const drawerPermanent =
+    Platform.OS === 'web' && width >= PERMANENT_DRAWER_BREAKPOINT;
 
   const tileSize = isCompact ? 130 : isMedium ? 150 : 180;
   const greetingSize = isCompact ? 34 : isMedium ? 40 : 46;
@@ -186,11 +194,20 @@ export default function HomeScreen() {
         >
           {/* ── Header ────────────────────────────────── */}
           <View style={[styles.header, { paddingHorizontal: hPad }]}>
-            <HeaderIconButton
-              icon="menu"
-              onPress={openDrawer}
-              colors={colors}
-            />
+            {/* The hamburger is only useful when the drawer is an
+                overlay. With a permanent drawer on wide web, the
+                drawer is already visible — the button would be
+                redundant. Fixed-width spacer keeps the right-side
+                buttons anchored to the same spot either way. */}
+            {!drawerPermanent ? (
+              <HeaderIconButton
+                icon="menu"
+                onPress={openDrawer}
+                colors={colors}
+              />
+            ) : (
+              <View style={{ width: 42 }} />
+            )}
 
             <View style={styles.headerActions}>
               <HeaderIconButton
@@ -435,7 +452,11 @@ function HeaderIconButton({
         hovered && { backgroundColor: colors.surfaceElevated },
       ]}
     >
-      <Feather name={icon} size={icon === 'menu' ? 22 : 20} color={colors.icon} />
+      <Feather
+        name={icon}
+        size={icon === 'menu' ? 22 : 20}
+        color={colors.icon}
+      />
     </Pressable>
   );
 }
@@ -566,7 +587,7 @@ function SongTile({
           </View>
         )}
 
-        {/* Hover overlay — a subtle dark scrim across the artwork.
+        {/* Hover overlay — a subtle dark scrim with a play button.
             On native this never triggers since hovered stays false. */}
         {hovered && (
           <View
