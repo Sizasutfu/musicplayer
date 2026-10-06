@@ -1,5 +1,5 @@
 // app/(drawer)/(tabs)/playlists.tsx
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -11,8 +11,9 @@ import {
   TextInput,
   ActivityIndicator,
   KeyboardAvoidingView,
-  Platform,
   ScrollView,
+  Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -20,15 +21,42 @@ import { usePlaylists } from '../../../hooks/usePlaylists';
 import { useLibrary } from '../../../hooks/useLibrary';
 import { useTheme } from '../../../context/ThemeContext';
 import { useHeaderBack } from '../../../hooks/useHeaderBack';
+import { useHover } from '../../../hooks/useHover';
 import MiniPlayer from '../../../components/MiniPlayer';
+
+// Matches the content cap used by the other list screens.
+const CONTENT_MAX_WIDTH = 900;
 
 const MINI_PLAYER_HEIGHT = 60;
 const FAB_GAP_ABOVE_MINI_PLAYER = 16;
+
+// ── Responsive sizing ──────────────────────────────────
+type Layout = {
+  hPad: number;
+  iconSize: number;
+  rowGap: number;
+  rowVPad: number;
+  titleSize: number;
+};
+
+function layoutFor(width: number): Layout {
+  if (width < 500) {
+    return { hPad: 20, iconSize: 48, rowGap: 14, rowVPad: 12, titleSize: 15 };
+  }
+  if (width < 900) {
+    return { hPad: 24, iconSize: 56, rowGap: 16, rowVPad: 14, titleSize: 15 };
+  }
+  return { hPad: 32, iconSize: 64, rowGap: 18, rowVPad: 14, titleSize: 16 };
+}
 
 export default function PlaylistsScreen() {
   const { playlists, loaded, create, remove } = usePlaylists();
   const { songs } = useLibrary();
   const { colors, design } = useTheme();
+
+  const { width } = useWindowDimensions();
+  const isWide = width >= 900;
+  const L = useMemo(() => layoutFor(width), [width]);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState('');
@@ -57,6 +85,11 @@ export default function PlaylistsScreen() {
     );
   };
 
+  const closeCreate = () => {
+    setCreateOpen(false);
+    setNewName('');
+  };
+
   if (!loaded) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
@@ -70,8 +103,17 @@ export default function PlaylistsScreen() {
       <FlatList
         data={playlists}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingHorizontal: L.hPad }]}
         showsVerticalScrollIndicator={false}
+        style={
+          isWide
+            ? {
+                width: '100%',
+                maxWidth: CONTENT_MAX_WIDTH,
+                alignSelf: 'center',
+              }
+            : undefined
+        }
         ListHeaderComponent={
           playlists.length > 0 ? (
             <Text
@@ -88,69 +130,21 @@ export default function PlaylistsScreen() {
             </Text>
           ) : null
         }
-        renderItem={({ item }) => {
-          const trackCount = item.trackUris.length;
-          return (
-            <Pressable
-              onPress={() =>
-                router.push({
-                  pathname: '/playlist/[id]',
-                  params: { id: item.id },
-                } as any)
-              }
-              onLongPress={() => confirmDelete(item.id, item.name)}
-              delayLongPress={400}
-              style={({ pressed }) => [
-                styles.row,
-                {
-                  paddingVertical: design.row.paddingVertical + 2,
-                  borderBottomWidth: design.row.borderBottomWidth,
-                  borderBottomColor: design.row.borderBottomColor,
-                },
-                pressed && { backgroundColor: colors.surfaceElevated },
-              ]}
-            >
-              <View
-                style={[
-                  styles.iconWrap,
-                  {
-                    backgroundColor: colors.rowActive,
-                    borderRadius: design.radius.item,
-                  },
-                ]}
-              >
-                <Feather name="list" size={22} color={colors.primary} />
-              </View>
-
-              <View style={{ flex: 1 }}>
-                <Text
-                  numberOfLines={1}
-                  style={[
-                    design.type.body,
-                    { color: colors.text, fontWeight: '600' },
-                  ]}
-                >
-                  {item.name}
-                </Text>
-                <Text
-                  numberOfLines={1}
-                  style={[
-                    design.type.caption,
-                    { color: colors.textSecondary, marginTop: 2 },
-                  ]}
-                >
-                  {trackCount} {trackCount === 1 ? 'track' : 'tracks'}
-                </Text>
-              </View>
-
-              <Feather
-                name="chevron-right"
-                size={18}
-                color={colors.textMuted}
-              />
-            </Pressable>
-          );
-        }}
+        renderItem={({ item }) => (
+          <PlaylistRow
+            playlist={item}
+            layout={L}
+            onPress={() =>
+              router.push({
+                pathname: '/playlist/[id]',
+                params: { id: item.id },
+              } as any)
+            }
+            onLongPress={() => confirmDelete(item.id, item.name)}
+            colors={colors}
+            design={design}
+          />
+        )}
         ListEmptyComponent={
           <View style={styles.center}>
             <Feather name="list" size={42} color={colors.iconMuted} />
@@ -174,44 +168,20 @@ export default function PlaylistsScreen() {
         }
       />
 
-      <Pressable
+      <CreateFAB
         onPress={() => setCreateOpen(true)}
-        style={({ pressed }) => [
-          styles.fab,
-          {
-            backgroundColor: colors.primary,
-            bottom: MINI_PLAYER_HEIGHT + FAB_GAP_ABOVE_MINI_PLAYER,
-            shadowColor: colors.fabShadow,
-          },
-          pressed && { opacity: 0.9, transform: [{ scale: 0.96 }] },
-        ]}
-      >
-        <Feather name="plus" size={24} color={colors.primaryText} />
-      </Pressable>
+        colors={colors}
+      />
 
       <Modal
         visible={createOpen}
         transparent
         animationType="fade"
-        onRequestClose={() => setCreateOpen(false)}
+        onRequestClose={closeCreate}
       >
-        {/* `padding` on both platforms. Android's old `undefined`
-            behaviour meant the card sat still while the keyboard
-            covered the Create button. iOS padding was already
-            correct; unifying the two keeps behaviour predictable. */}
-        <KeyboardAvoidingView
-          style={styles.modalOverlay}
-          behavior="padding"
-        >
-          <Pressable
-            style={styles.modalBackdrop}
-            onPress={() => setCreateOpen(false)}
-          />
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior="padding">
+          <Pressable style={styles.modalBackdrop} onPress={closeCreate} />
 
-          {/* ScrollView so the card can shift up when the keyboard
-              covers the lower half of the screen without squashing
-              the input. `keyboardShouldPersistTaps` keeps the
-              Create tap working while the keyboard is up. */}
           <ScrollView
             contentContainerStyle={styles.modalScrollContent}
             keyboardShouldPersistTaps="handled"
@@ -260,41 +230,21 @@ export default function PlaylistsScreen() {
                 onSubmitEditing={handleCreate}
               />
               <View style={styles.modalActions}>
-                <Pressable
-                  onPress={() => {
-                    setCreateOpen(false);
-                    setNewName('');
-                  }}
-                  style={[
-                    styles.modalBtn,
-                    {
-                      backgroundColor: colors.chipBg,
-                      borderRadius: design.radius.item,
-                    },
-                  ]}
-                >
-                  <Text style={[design.type.body, { color: colors.text }]}>
-                    Cancel
-                  </Text>
-                </Pressable>
-                <Pressable
+                <ModalButton
+                  label="Cancel"
+                  variant="secondary"
+                  onPress={closeCreate}
+                  colors={colors}
+                  design={design}
+                />
+                <ModalButton
+                  label="Create"
+                  variant="primary"
                   onPress={handleCreate}
                   disabled={!newName.trim()}
-                  style={[
-                    styles.modalBtn,
-                    {
-                      backgroundColor: colors.primary,
-                      borderRadius: design.radius.item,
-                    },
-                    !newName.trim() && { opacity: 0.5 },
-                  ]}
-                >
-                  <Text
-                    style={[design.type.body, { color: colors.primaryText }]}
-                  >
-                    Create
-                  </Text>
-                </Pressable>
+                  colors={colors}
+                  design={design}
+                />
               </View>
             </View>
           </ScrollView>
@@ -303,6 +253,170 @@ export default function PlaylistsScreen() {
 
       <MiniPlayer bottomOffset={0} />
     </View>
+  );
+}
+
+// ── Playlist row ────────────────────────────────────────
+// Extracted so it can hold its own hover state. Rendering it
+// inline from the parent's renderItem would be a hook-in-a-loop.
+function PlaylistRow({
+  playlist,
+  layout,
+  onPress,
+  onLongPress,
+  colors,
+  design,
+}: {
+  playlist: any;
+  layout: Layout;
+  onPress: () => void;
+  onLongPress: () => void;
+  colors: any;
+  design: any;
+}) {
+  const { hovered, hoverProps } = useHover();
+  const isWeb = Platform.OS === 'web';
+
+  const trackCount = playlist.trackUris.length;
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={400}
+      style={[
+        styles.row,
+        {
+          paddingVertical: layout.rowVPad,
+          gap: layout.rowGap,
+        },
+        hovered && isWeb && { backgroundColor: colors.surfaceElevated },
+      ]}
+    >
+      <View
+        style={{
+          width: layout.iconSize,
+          height: layout.iconSize,
+          backgroundColor: colors.rowActive,
+          borderRadius: design.radius.item,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Feather
+          name="list"
+          size={Math.round(layout.iconSize * 0.46)}
+          color={colors.primary}
+        />
+      </View>
+
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text
+          numberOfLines={1}
+          style={[
+            design.type.body,
+            {
+              color: colors.text,
+              fontWeight: '600',
+              fontSize: layout.titleSize,
+            },
+          ]}
+        >
+          {playlist.name}
+        </Text>
+        <Text
+          numberOfLines={1}
+          style={[
+            design.type.caption,
+            { color: colors.textSecondary, marginTop: 2 },
+          ]}
+        >
+          {trackCount} {trackCount === 1 ? 'track' : 'tracks'}
+        </Text>
+      </View>
+
+      <Feather
+        name="chevron-right"
+        size={18}
+        color={colors.textMuted}
+      />
+    </Pressable>
+  );
+}
+
+// ── FAB ─────────────────────────────────────────────────
+function CreateFAB({
+  onPress,
+  colors,
+}: {
+  onPress: () => void;
+  colors: any;
+}) {
+  const { hovered, hoverProps } = useHover();
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      style={[
+        styles.fab,
+        {
+          backgroundColor: colors.primary,
+          bottom: MINI_PLAYER_HEIGHT + FAB_GAP_ABOVE_MINI_PLAYER,
+          shadowColor: colors.fabShadow,
+        },
+        hovered && { opacity: 0.9, transform: [{ scale: 1.04 }] },
+      ]}
+    >
+      <Feather name="plus" size={24} color={colors.primaryText} />
+    </Pressable>
+  );
+}
+
+// ── Modal button ────────────────────────────────────────
+function ModalButton({
+  label,
+  variant,
+  onPress,
+  disabled,
+  colors,
+  design,
+}: {
+  label: string;
+  variant: 'primary' | 'secondary';
+  onPress: () => void;
+  disabled?: boolean;
+  colors: any;
+  design: any;
+}) {
+  const { hovered, hoverProps } = useHover();
+  const isPrimary = variant === 'primary';
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      disabled={disabled}
+      style={[
+        styles.modalBtn,
+        {
+          backgroundColor: isPrimary ? colors.primary : colors.chipBg,
+          borderRadius: design.radius.item,
+        },
+        hovered && !disabled && { opacity: 0.9 },
+        disabled && { opacity: 0.5 },
+      ]}
+    >
+      <Text
+        style={[
+          design.type.body,
+          { color: isPrimary ? colors.primaryText : colors.text },
+        ]}
+      >
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -319,14 +433,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    paddingHorizontal: 20,
-  },
-  iconWrap: {
-    width: 48,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: 12,
   },
   fab: {
     position: 'absolute',
@@ -346,10 +453,6 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
   },
-  // Scroll content is a full-height flex that centers its child
-  // horizontally and vertically, then lets the child flow to the
-  // top if the keyboard shrinks the visible area. `paddingVertical`
-  // gives the card room on small screens with tall keyboards.
   modalScrollContent: {
     flexGrow: 1,
     alignItems: 'center',
@@ -358,12 +461,12 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
   },
   modalBackdrop: {
-   position: 'absolute',
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  backgroundColor: 'rgba(0,0,0,0.5)',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalCard: {
     width: '100%',
