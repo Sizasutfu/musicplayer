@@ -8,6 +8,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { Platform } from 'react-native';
 import * as MediaLibrary from 'expo-media-library/legacy';
 import {
   type TrackMetadata,
@@ -16,6 +17,7 @@ import {
   getCached,
   setCached,
 } from '../lib/metadata';
+import { fetchWebLibrary } from '../lib/webLibrary';
 import { useTheme } from './ThemeContext';
 
 export type Song = TrackMetadata & {
@@ -27,7 +29,6 @@ export type Song = TrackMetadata & {
 
 type LibraryContextValue = {
   songs: Song[];
-  /** Every song from the device, unfiltered. Used for diagnostics and counts. */
   allSongs: Song[];
   loading: boolean;
   granting: boolean;
@@ -60,6 +61,20 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
     setError(null);
 
     try {
+      // ── Web path ────────────────────────────────────────
+      // The browser has no access to the user's disk, so the
+      // library comes from the Circle API instead. Metadata is
+      // already complete in the response, so no enrichment pass
+      // and no cache are needed.
+      if (Platform.OS === 'web') {
+        const tracks = await fetchWebLibrary();
+        if (cancelled.current) return;
+        setGranted(true);
+        setAllSongs(tracks);
+        return;
+      }
+
+      // ── Native path (unchanged) ─────────────────────────
       const perm = await MediaLibrary.requestPermissionsAsync(
         false,
         ['audio']
@@ -81,7 +96,6 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
         sortBy: ['default'],
       });
 
-      // Step 1: fast list from filename + duration
       const fast: Song[] = assets.map((a) => {
         const fallback = mergeMetadata(a.filename, {});
         return {
@@ -98,10 +112,6 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
       setEnriching(true);
 
-      // Step 2: apply cached metadata first, recording which IDs
-      // hit the cache. The cache is keyed on the MediaLibrary asset
-      // ID, which is stable across sessions and independent of any
-      // URI churn.
       const cachedIds = new Set<string>();
       const withCache: Song[] = await Promise.all(
         fast.map(async (s) => {
@@ -117,13 +127,6 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
       if (cancelled.current) return;
       setAllSongs(withCache);
 
-      // Step 3: extract ID3 tags for tracks that were NOT in the
-      // cache. A track that was cached is trusted as-is — even if
-      // its metadata looks empty, because we already tried once and
-      // there's nothing more to read. This is what prevents the
-      // "reads tags every launch" loop: a file with no artist tag
-      // and no artwork gets cached with `Unknown Artist` and never
-      // re-read.
       const uncached = withCache.filter((s) => !cachedIds.has(s.id));
 
       for (const song of uncached) {
@@ -158,15 +161,11 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
     };
   }, [load]);
 
-  // ── Filter applied on top of the raw list ────────────────
-  // Pure derivation — changing the setting in Settings re-runs
-  // this without rescanning the device.
   const songs = useMemo(() => {
     const min = settings.minSongDuration;
     if (!min || min <= 0) return allSongs;
 
     return allSongs.filter((s) => {
-      // Keep songs with unknown duration — we can't know if they're short.
       if (s.duration === undefined || s.duration === null) return true;
       return s.duration >= min;
     });
