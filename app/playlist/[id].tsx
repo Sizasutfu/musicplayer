@@ -13,16 +13,24 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { usePlaylists } from '../../hooks/usePlaylists';
 import { useLibrary, type Song } from '../../hooks/useLibrary';
 import { usePlayer } from '../../context/PlayerContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useHover } from '../../hooks/useHover';
 import MiniPlayer from '../../components/MiniPlayer';
 import SongActionSheet from '../../components/SongActionSheet';
+
+// Matches the content cap used by the other list screens.
+const CONTENT_MAX_WIDTH = 900;
 
 function formatDuration(seconds?: number) {
   if (!seconds || isNaN(seconds)) return '';
@@ -31,12 +39,58 @@ function formatDuration(seconds?: number) {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+// ── Responsive sizing ──────────────────────────────────
+type Layout = {
+  hPad: number;
+  coverSize: number;
+  artSize: number;
+  rowGap: number;
+  rowVPad: number;
+  titleSize: number;
+};
+
+function layoutFor(width: number, height: number): Layout {
+  if (width < 500) {
+    return {
+      hPad: 20,
+      coverSize: 160,
+      artSize: 44,
+      rowGap: 12,
+      rowVPad: 12,
+      titleSize: 15,
+    };
+  }
+  if (width < 900) {
+    return {
+      hPad: 24,
+      coverSize: 180,
+      artSize: 52,
+      rowGap: 14,
+      rowVPad: 14,
+      titleSize: 15,
+    };
+  }
+  return {
+    hPad: 32,
+    coverSize: Math.min(220, height * 0.28),
+    artSize: 60,
+    rowGap: 16,
+    rowVPad: 14,
+    titleSize: 16,
+  };
+}
+
 export default function PlaylistDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { playlists, remove, rename, removeTrack } = usePlaylists();
   const { songs, loading: libraryLoading } = useLibrary();
   const { playQueue, currentTrack, isPlaying } = usePlayer();
   const { colors, design } = useTheme();
+  const insets = useSafeAreaInsets();
+
+  const { width, height } = useWindowDimensions();
+  const isWide = width >= 900;
+  const L = useMemo(() => layoutFor(width, height), [width, height]);
 
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameText, setRenameText] = useState('');
@@ -106,7 +160,7 @@ export default function PlaylistDetailScreen() {
         style={[styles.root, { backgroundColor: colors.background }]}
         edges={['top']}
       >
-        <View style={styles.topBar}>
+        <View style={[styles.topBar, { paddingHorizontal: isWide ? 16 : 8 }]}>
           <Pressable onPress={handleClose} style={styles.iconBtn} hitSlop={10}>
             <Feather name="chevron-left" size={26} color={colors.icon} />
           </Pressable>
@@ -140,7 +194,7 @@ export default function PlaylistDetailScreen() {
       style={[styles.root, { backgroundColor: colors.background }]}
       edges={['top']}
     >
-      <View style={styles.topBar}>
+      <View style={[styles.topBar, { paddingHorizontal: isWide ? 16 : 8 }]}>
         <Pressable onPress={handleClose} style={styles.iconBtn} hitSlop={10}>
           <Feather name="chevron-left" size={26} color={colors.icon} />
         </Pressable>
@@ -163,176 +217,39 @@ export default function PlaylistDetailScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingBottom: 160 }}
         showsVerticalScrollIndicator={false}
-        ListHeaderComponent={
-          <View style={styles.headerBlock}>
-            <View
-              style={[
-                styles.cover,
-                {
-                  backgroundColor: colors.artPlaceholder,
-                  borderRadius: design.radius.card + 4,
-                },
-              ]}
-            >
-              <Feather name="list" size={56} color={colors.iconMuted} />
-            </View>
-
-            <Text
-              numberOfLines={2}
-              style={[
-                design.type.title,
-                { color: colors.text, textAlign: 'center' },
-              ]}
-            >
-              {playlist.name}
-            </Text>
-            <Text
-              style={[
-                design.type.caption,
-                { color: colors.textMuted, marginTop: 4 },
-              ]}
-            >
-              {tracks.length} {tracks.length === 1 ? 'track' : 'tracks'}
-              {totalMin > 0 ? ` · ${totalMin} min` : ''}
-            </Text>
-
-            <View style={styles.headerActions}>
-              <Pressable
-                onPress={() => handlePlay(0)}
-                disabled={tracks.length === 0}
-                style={({ pressed }) => [
-                  styles.playAllBtn,
-                  {
-                    backgroundColor: colors.primary,
-                    borderRadius: design.radius.pill,
-                  },
-                  tracks.length === 0 && { opacity: 0.4 },
-                  pressed && tracks.length > 0 && { opacity: 0.85 },
-                ]}
-              >
-                <Feather name="play" size={18} color={colors.primaryText} />
-                <Text
-                  style={[
-                    design.type.body,
-                    { color: colors.primaryText, fontWeight: '700' },
-                  ]}
-                >
-                  Play
-                </Text>
-              </Pressable>
-
-              <Pressable
-                onPress={confirmDelete}
-                style={[
-                  styles.secondaryBtn,
-                  {
-                    borderColor: colors.border,
-                    backgroundColor: colors.surface,
-                    borderRadius: design.radius.pill,
-                  },
-                ]}
-              >
-                <Feather name="trash-2" size={16} color={colors.danger} />
-                <Text
-                  style={[
-                    design.type.body,
-                    { color: colors.danger, fontWeight: '700' },
-                  ]}
-                >
-                  Delete
-                </Text>
-              </Pressable>
-            </View>
-          </View>
+        style={
+          isWide
+            ? {
+                width: '100%',
+                maxWidth: CONTENT_MAX_WIDTH,
+                alignSelf: 'center',
+              }
+            : undefined
         }
-        renderItem={({ item, index }) => {
-          const active = currentTrack?.id === item.id;
-          return (
-            <Pressable
-              onPress={() => handlePlay(index)}
-              onLongPress={() => setActionSong(item)}
-              delayLongPress={400}
-              style={({ pressed }) => [
-                styles.row,
-                {
-                  paddingVertical: design.row.paddingVertical,
-                  borderBottomWidth: design.row.borderBottomWidth,
-                  borderBottomColor: design.row.borderBottomColor,
-                },
-                active && { backgroundColor: colors.rowActive },
-                pressed && { opacity: 0.7 },
-              ]}
-            >
-              {item.artwork ? (
-                <Image
-                  source={{ uri: item.artwork }}
-                  style={[
-                    styles.art,
-                    { borderRadius: design.radius.item },
-                  ]}
-                />
-              ) : (
-                <View
-                  style={[
-                    styles.art,
-                    {
-                      borderRadius: design.radius.item,
-                      backgroundColor: colors.artPlaceholder,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    },
-                    active && { backgroundColor: colors.primary },
-                  ]}
-                >
-                  <Feather
-                    name="music"
-                    size={16}
-                    color={active ? colors.primaryText : colors.iconMuted}
-                  />
-                </View>
-              )}
-
-              <View style={{ flex: 1 }}>
-                <Text
-                  numberOfLines={1}
-                  style={[
-                    design.type.body,
-                    { color: colors.text, fontWeight: '600' },
-                    active && { color: colors.primary },
-                  ]}
-                >
-                  {item.title}
-                </Text>
-                <Text
-                  numberOfLines={1}
-                  style={[
-                    design.type.caption,
-                    { color: colors.textSecondary, marginTop: 2 },
-                  ]}
-                >
-                  {item.artist}
-                </Text>
-              </View>
-
-              {active && isPlaying && (
-                <Feather name="volume-2" size={16} color={colors.primary} />
-              )}
-
-              <Text
-                style={[
-                  design.type.caption,
-                  {
-                    color: colors.textMuted,
-                    fontVariant: ['tabular-nums'],
-                    marginLeft: 8,
-                  },
-                ]}
-              >
-                {formatDuration(item.duration)}
-              </Text>
-            </Pressable>
-          );
-        }}
+        ListHeaderComponent={
+          <PlaylistHeader
+            playlist={playlist}
+            trackCount={tracks.length}
+            totalMin={totalMin}
+            layout={L}
+            onPlayAll={() => handlePlay(0)}
+            onDelete={confirmDelete}
+            colors={colors}
+            design={design}
+          />
+        }
+        renderItem={({ item, index }) => (
+          <SongRow
+            song={item}
+            isActive={currentTrack?.id === item.id}
+            isPlaying={isPlaying}
+            layout={L}
+            onPress={() => handlePlay(index)}
+            onMenu={() => setActionSong(item)}
+            colors={colors}
+            design={design}
+          />
+        )}
         ListEmptyComponent={
           libraryLoading ? (
             <View style={styles.emptyWrap}>
@@ -366,7 +283,7 @@ export default function PlaylistDetailScreen() {
         }
       />
 
-      <MiniPlayer />
+      <MiniPlayer bottomOffset={insets.bottom} />
 
       <SongActionSheet
         visible={!!actionSong}
@@ -384,92 +301,427 @@ export default function PlaylistDetailScreen() {
         ]}
       />
 
-      <Modal
+      <RenameModal
         visible={renameOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setRenameOpen(false)}
+        value={renameText}
+        onChange={setRenameText}
+        onCancel={() => setRenameOpen(false)}
+        onSubmit={submitRename}
+        colors={colors}
+        design={design}
+      />
+    </SafeAreaView>
+  );
+}
+
+// ── Playlist header ─────────────────────────────────────
+function PlaylistHeader({
+  playlist,
+  trackCount,
+  totalMin,
+  layout,
+  onPlayAll,
+  onDelete,
+  colors,
+  design,
+}: {
+  playlist: { name: string };
+  trackCount: number;
+  totalMin: number;
+  layout: Layout;
+  onPlayAll: () => void;
+  onDelete: () => void;
+  colors: any;
+  design: any;
+}) {
+  return (
+    <View
+      style={[
+        styles.headerBlock,
+        {
+          paddingHorizontal: layout.hPad + 4,
+          paddingTop: 8,
+          paddingBottom: 20,
+        },
+      ]}
+    >
+      <View
+        style={{
+          width: layout.coverSize,
+          height: layout.coverSize,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: 16,
+          backgroundColor: colors.artPlaceholder,
+          borderRadius: design.radius.card + 4,
+        }}
       >
-        <KeyboardAvoidingView
-          style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        <Feather
+          name="list"
+          size={Math.round(layout.coverSize * 0.35)}
+          color={colors.iconMuted}
+        />
+      </View>
+
+      <Text
+        numberOfLines={2}
+        style={[
+          design.type.title,
+          { color: colors.text, textAlign: 'center' },
+        ]}
+      >
+        {playlist.name}
+      </Text>
+      <Text
+        style={[
+          design.type.caption,
+          { color: colors.textMuted, marginTop: 4 },
+        ]}
+      >
+        {trackCount} {trackCount === 1 ? 'track' : 'tracks'}
+        {totalMin > 0 ? ` · ${totalMin} min` : ''}
+      </Text>
+
+      <View style={styles.headerActions}>
+        <PlayAllButton
+          onPress={onPlayAll}
+          disabled={trackCount === 0}
+          colors={colors}
+          design={design}
+        />
+        <DeleteButton
+          onPress={onDelete}
+          colors={colors}
+          design={design}
+        />
+      </View>
+    </View>
+  );
+}
+
+function PlayAllButton({
+  onPress,
+  disabled,
+  colors,
+  design,
+}: {
+  onPress: () => void;
+  disabled?: boolean;
+  colors: any;
+  design: any;
+}) {
+  const { hovered, hoverProps } = useHover();
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      disabled={disabled}
+      style={[
+        styles.playAllBtn,
+        {
+          backgroundColor: colors.primary,
+          borderRadius: design.radius.pill,
+        },
+        hovered && !disabled && { opacity: 0.9 },
+        disabled && { opacity: 0.4 },
+      ]}
+    >
+      <Feather name="play" size={18} color={colors.primaryText} />
+      <Text
+        style={[
+          design.type.body,
+          { color: colors.primaryText, fontWeight: '700' },
+        ]}
+      >
+        Play
+      </Text>
+    </Pressable>
+  );
+}
+
+function DeleteButton({
+  onPress,
+  colors,
+  design,
+}: {
+  onPress: () => void;
+  colors: any;
+  design: any;
+}) {
+  const { hovered, hoverProps } = useHover();
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      style={[
+        styles.secondaryBtn,
+        {
+          borderColor: colors.border,
+          backgroundColor: colors.surface,
+          borderRadius: design.radius.pill,
+        },
+        hovered && { backgroundColor: colors.surfaceElevated },
+      ]}
+    >
+      <Feather name="trash-2" size={16} color={colors.danger} />
+      <Text
+        style={[
+          design.type.body,
+          { color: colors.danger, fontWeight: '700' },
+        ]}
+      >
+        Delete
+      </Text>
+    </Pressable>
+  );
+}
+
+// ── Song row ────────────────────────────────────────────
+function SongRow({
+  song,
+  isActive,
+  isPlaying,
+  layout,
+  onPress,
+  onMenu,
+  colors,
+  design,
+}: {
+  song: Song;
+  isActive: boolean;
+  isPlaying: boolean;
+  layout: Layout;
+  onPress: () => void;
+  onMenu: () => void;
+  colors: any;
+  design: any;
+}) {
+  const { hovered, hoverProps } = useHover();
+  const isWeb = Platform.OS === 'web';
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      onLongPress={onMenu}
+      delayLongPress={400}
+      style={[
+        styles.row,
+        {
+          paddingHorizontal: layout.hPad,
+          paddingVertical: layout.rowVPad,
+          gap: layout.rowGap,
+        },
+        isActive && { backgroundColor: colors.rowActive },
+        !isActive && isWeb && hovered && {
+          backgroundColor: colors.surfaceElevated,
+        },
+      ]}
+    >
+      {song.artwork ? (
+        <Image
+          source={{ uri: song.artwork }}
+          style={{
+            width: layout.artSize,
+            height: layout.artSize,
+            borderRadius: design.radius.item,
+            backgroundColor: colors.artPlaceholder,
+          }}
+        />
+      ) : (
+        <View
+          style={{
+            width: layout.artSize,
+            height: layout.artSize,
+            borderRadius: design.radius.item,
+            backgroundColor: isActive
+              ? colors.primary
+              : colors.artPlaceholder,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
         >
-          <Pressable
-            style={styles.modalBackdrop}
-            onPress={() => setRenameOpen(false)}
+          <Feather
+            name="music"
+            size={Math.round(layout.artSize * 0.36)}
+            color={isActive ? colors.primaryText : colors.iconMuted}
           />
-          <View
+        </View>
+      )}
+
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text
+          numberOfLines={1}
+          style={[
+            design.type.body,
+            {
+              color: isActive ? colors.primary : colors.text,
+              fontWeight: '600',
+              fontSize: layout.titleSize,
+            },
+          ]}
+        >
+          {song.title}
+        </Text>
+        <Text
+          numberOfLines={1}
+          style={[
+            design.type.caption,
+            { color: colors.textSecondary, marginTop: 2 },
+          ]}
+        >
+          {song.artist}
+        </Text>
+      </View>
+
+      {isActive && isPlaying && (
+        <Feather name="volume-2" size={16} color={colors.primary} />
+      )}
+
+      <Text
+        style={[
+          design.type.caption,
+          {
+            color: colors.textMuted,
+            fontVariant: ['tabular-nums'],
+            marginLeft: 8,
+          },
+        ]}
+      >
+        {formatDuration(song.duration)}
+      </Text>
+    </Pressable>
+  );
+}
+
+// ── Rename modal ────────────────────────────────────────
+function RenameModal({
+  visible,
+  value,
+  onChange,
+  onCancel,
+  onSubmit,
+  colors,
+  design,
+}: {
+  visible: boolean;
+  value: string;
+  onChange: (v: string) => void;
+  onCancel: () => void;
+  onSubmit: () => void;
+  colors: any;
+  design: any;
+}) {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onCancel}
+    >
+      <KeyboardAvoidingView style={styles.modalOverlay} behavior="padding">
+        <Pressable style={styles.modalBackdrop} onPress={onCancel} />
+        <View
+          style={[
+            design.card,
+            styles.modalCard,
+            { backgroundColor: colors.surface },
+          ]}
+        >
+          <Text
             style={[
-              design.card,
-              styles.modalCard,
-              { backgroundColor: colors.surface },
+              design.type.heading,
+              { color: colors.text, marginBottom: 12 },
             ]}
           >
-            <Text
-              style={[
-                design.type.heading,
-                { color: colors.text, marginBottom: 12 },
-              ]}
-            >
-              Rename playlist
-            </Text>
-            <TextInput
-              autoFocus
-              value={renameText}
-              onChangeText={setRenameText}
-              placeholder="Playlist name"
-              placeholderTextColor={colors.textMuted}
-              style={[
-                styles.modalInput,
-                {
-                  backgroundColor: colors.surfaceElevated,
-                  color: colors.text,
-                  borderColor: colors.border,
-                  borderRadius: design.radius.item,
-                },
-              ]}
-              maxLength={60}
-              returnKeyType="done"
-              onSubmitEditing={submitRename}
+            Rename playlist
+          </Text>
+          <TextInput
+            autoFocus
+            value={value}
+            onChangeText={onChange}
+            placeholder="Playlist name"
+            placeholderTextColor={colors.textMuted}
+            style={[
+              styles.modalInput,
+              {
+                backgroundColor: colors.surfaceElevated,
+                color: colors.text,
+                borderColor: colors.border,
+                borderRadius: design.radius.item,
+              },
+            ]}
+            maxLength={60}
+            returnKeyType="done"
+            onSubmitEditing={onSubmit}
+          />
+          <View style={styles.modalActions}>
+            <ModalButton
+              label="Cancel"
+              variant="secondary"
+              onPress={onCancel}
+              colors={colors}
+              design={design}
             />
-            <View style={styles.modalActions}>
-              <Pressable
-                onPress={() => setRenameOpen(false)}
-                style={[
-                  styles.modalBtn,
-                  {
-                    backgroundColor: colors.chipBg,
-                    borderRadius: design.radius.item,
-                  },
-                ]}
-              >
-                <Text style={[design.type.body, { color: colors.text }]}>
-                  Cancel
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={submitRename}
-                disabled={!renameText.trim()}
-                style={[
-                  styles.modalBtn,
-                  {
-                    backgroundColor: colors.primary,
-                    borderRadius: design.radius.item,
-                  },
-                  !renameText.trim() && { opacity: 0.5 },
-                ]}
-              >
-                <Text
-                  style={[design.type.body, { color: colors.primaryText }]}
-                >
-                  Save
-                </Text>
-              </Pressable>
-            </View>
+            <ModalButton
+              label="Save"
+              variant="primary"
+              onPress={onSubmit}
+              disabled={!value.trim()}
+              colors={colors}
+              design={design}
+            />
           </View>
-        </KeyboardAvoidingView>
-      </Modal>
-    </SafeAreaView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+function ModalButton({
+  label,
+  variant,
+  onPress,
+  disabled,
+  colors,
+  design,
+}: {
+  label: string;
+  variant: 'primary' | 'secondary';
+  onPress: () => void;
+  disabled?: boolean;
+  colors: any;
+  design: any;
+}) {
+  const { hovered, hoverProps } = useHover();
+  const isPrimary = variant === 'primary';
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      disabled={disabled}
+      style={[
+        styles.modalBtn,
+        {
+          backgroundColor: isPrimary ? colors.primary : colors.chipBg,
+          borderRadius: design.radius.item,
+        },
+        hovered && !disabled && { opacity: 0.9 },
+        disabled && { opacity: 0.5 },
+      ]}
+    >
+      <Text
+        style={[
+          design.type.body,
+          { color: isPrimary ? colors.primaryText : colors.text },
+        ]}
+      >
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -487,7 +739,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 8,
     paddingVertical: 6,
   },
   iconBtn: {
@@ -499,16 +750,6 @@ const styles = StyleSheet.create({
 
   headerBlock: {
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 20,
-  },
-  cover: {
-    width: 160,
-    height: 160,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
   },
 
   headerActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
@@ -531,10 +772,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 20,
   },
-  art: { width: 44, height: 44 },
 
   emptyWrap: {
     alignItems: 'center',
@@ -549,7 +787,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalCard: {
