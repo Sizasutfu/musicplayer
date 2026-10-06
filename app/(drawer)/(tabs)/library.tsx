@@ -1,5 +1,6 @@
 // app/(drawer)/(tabs)/library.tsx
 import React, {
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -14,6 +15,7 @@ import {
   ActivityIndicator,
   StyleSheet,
   Image,
+  Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -50,11 +52,29 @@ export default function LibraryScreen() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [sort, setSort] = useState<SortMode>('title');
   const [actionSong, setActionSong] = useState<Song | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const inputRef = useRef<TextInput>(null);
 
   useLayoutEffect(() => {
     navigation.setOptions({ headerShown: false });
   }, [navigation]);
+
+  // Track keyboard height so the song list gets extra bottom
+  // padding while the keyboard is up. Without this, on Android
+  // edge-to-edge the keyboard overlays the window (it doesn't
+  // resize it) and the last rows become unreachable.
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const openSearch = () => setSearchOpen(true);
   const closeSearch = () => {
@@ -330,7 +350,7 @@ export default function LibraryScreen() {
         <SectionList
           sections={[{ data: filtered }]}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingBottom: 200 }}
+          contentContainerStyle={{ paddingBottom: 200 + keyboardHeight }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           initialNumToRender={20}

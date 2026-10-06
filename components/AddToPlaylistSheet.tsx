@@ -9,7 +9,6 @@ import {
   FlatList,
   TextInput,
   KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
   Alert,
 } from 'react-native';
@@ -70,10 +69,13 @@ export default function AddToPlaylistSheet({ visible, song, onClose }: Props) {
       animationType="slide"
       onRequestClose={close}
     >
-      <KeyboardAvoidingView
-        style={styles.overlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      {/*
+        `behavior="padding"` on both platforms. Android's old
+        `undefined` behaviour meant the sheet sat still while the
+        keyboard covered the input and Create button. iOS padding
+        was already correct; unifying keeps behaviour predictable.
+      */}
+      <KeyboardAvoidingView style={styles.overlay} behavior="padding">
         <Pressable style={styles.backdrop} onPress={close} />
 
         <SafeAreaView
@@ -147,6 +149,7 @@ export default function AddToPlaylistSheet({ visible, song, onClose }: Props) {
                 data={playlists}
                 keyExtractor={(item) => item.id}
                 style={{ maxHeight: 320 }}
+                keyboardShouldPersistTaps="handled"
                 ListEmptyComponent={
                   <View style={styles.empty}>
                     <Text
@@ -328,11 +331,11 @@ const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end' },
   backdrop: {
     position: 'absolute',
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  backgroundColor: 'rgba(0,0,0,0.5)',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   sheet: {
     borderTopLeftRadius: 20,
