@@ -3,7 +3,7 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { type DrawerContentComponentProps } from '@react-navigation/drawer';
+import type { DrawerContentComponentProps } from 'expo-router/drawer';
 import { router } from 'expo-router';
 import { useTheme } from '../context/ThemeContext';
 import { useProfile } from '../hooks/useProfile';

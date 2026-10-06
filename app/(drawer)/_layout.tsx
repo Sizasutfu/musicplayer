@@ -2,7 +2,7 @@
 import { Drawer } from 'expo-router/drawer';
 import { Pressable, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { DrawerActions } from '@react-navigation/native';
+import { DrawerActions } from "expo-router/react-navigation";
 import { useNavigation } from 'expo-router';
 import CustomDrawerContent from '../../components/CustomDrawerContent';
 import { useTheme } from '../../context/ThemeContext';
@@ -25,7 +25,14 @@ export default function DrawerLayout() {
   const { colors } = useTheme();
   return (
     <Drawer
-      drawerContent={(props) => <CustomDrawerContent {...props} />}
+      // Cast through `any`: expo-router bundles its own copy of
+      // @react-navigation/drawer, so its DrawerContentComponentProps
+      // differs from the standalone package's copy by class identity
+      // (protected PrivateValueStore). Structurally identical, but
+      // TS refuses to unify them. Safe to widen at this one boundary.
+      drawerContent={(props) => (
+        <CustomDrawerContent {...(props as any)} />
+      )}
       screenOptions={{
         headerShown: true,
         headerStyle: { backgroundColor: colors.headerBg },

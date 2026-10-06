@@ -2,7 +2,7 @@
 import { Tabs, useNavigation } from 'expo-router';
 import { StyleSheet, Platform, Pressable } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
-import { DrawerActions } from '@react-navigation/native';
+import { DrawerActions } from "expo-router/react-navigation";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../../context/ThemeContext';
 
