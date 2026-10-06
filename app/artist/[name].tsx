@@ -7,7 +7,8 @@ import {
   Pressable,
   Image,
   StyleSheet,
-  Dimensions,
+  Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -16,23 +17,61 @@ import { useLibrary, type Song } from '../../hooks/useLibrary';
 import { groupByArtist, type Album, type Artist } from '../../lib/metadata';
 import { usePlayer } from '../../context/PlayerContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useHover } from '../../hooks/useHover';
 import MiniPlayer from '../../components/MiniPlayer';
 import SongActionSheet from '../../components/SongActionSheet';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const H_PADDING = 16;
-const GAP = 12;
-const NUM_COLS = 2;
-const TILE_SIZE =
-  (SCREEN_WIDTH - H_PADDING * 2 - GAP * (NUM_COLS - 1)) / NUM_COLS;
+// Content cap matches the other list screens.
+const CONTENT_MAX_WIDTH = 900;
 
 type Tab = 'albums' | 'songs';
+
+// ── Responsive sizing ──────────────────────────────────
+type Layout = {
+  hPad: number;           // horizontal gutter
+  gap: number;            // gap between grid tiles / rows
+  cols: number;           // columns in the album grid
+  avatarSize: number;     // header artist avatar
+  songRowVPad: number;
+};
+
+function layoutFor(width: number): Layout {
+  if (width < 500) {
+    return { hPad: 16, gap: 12, cols: 2, avatarSize: 140, songRowVPad: 12 };
+  }
+  if (width < 900) {
+    return { hPad: 24, gap: 16, cols: 3, avatarSize: 160, songRowVPad: 14 };
+  }
+  return { hPad: 32, gap: 20, cols: 4, avatarSize: 180, songRowVPad: 14 };
+}
+
+// Tile size must account for the max-width cap on wide screens —
+// otherwise the last column would overflow past the capped
+// container on a very wide viewport.
+function computeTileSize(
+  viewportWidth: number,
+  layout: Layout
+): number {
+  const effective = Math.min(viewportWidth, CONTENT_MAX_WIDTH);
+  const inner =
+    effective - layout.hPad * 2 - layout.gap * (layout.cols - 1);
+  return Math.floor(inner / layout.cols);
+}
 
 export default function ArtistDetailScreen() {
   const { name } = useLocalSearchParams<{ name: string }>();
   const { songs } = useLibrary();
   const { playQueue, currentTrack, isPlaying } = usePlayer();
   const { colors, design } = useTheme();
+
+  const { width } = useWindowDimensions();
+  const isWide = width >= 900;
+  const L = useMemo(() => layoutFor(width), [width]);
+  const tileSize = useMemo(
+    () => computeTileSize(width, L),
+    [width, L]
+  );
+
   const [tab, setTab] = useState<Tab>('albums');
   const [actionSong, setActionSong] = useState<Song | null>(null);
 
@@ -89,7 +128,7 @@ export default function ArtistDetailScreen() {
       style={[styles.root, { backgroundColor: colors.background }]}
       edges={['top']}
     >
-      <View style={styles.topBar}>
+      <View style={[styles.topBar, { paddingHorizontal: isWide ? 16 : 8 }]}>
         <Pressable onPress={handleClose} hitSlop={10} style={styles.iconBtn}>
           <Feather name="chevron-left" size={26} color={colors.icon} />
         </Pressable>
@@ -107,12 +146,24 @@ export default function ArtistDetailScreen() {
 
       {tab === 'albums' ? (
         <FlatList
-          key="albums"
+          key={`albums-${L.cols}`}
           data={artist.albums}
           keyExtractor={(item) => item.key}
-          numColumns={NUM_COLS}
-          contentContainerStyle={styles.gridContent}
-          columnWrapperStyle={{ gap: GAP }}
+          numColumns={L.cols}
+          contentContainerStyle={[
+            styles.gridContent,
+            { paddingHorizontal: L.hPad, gap: L.gap },
+          ]}
+          columnWrapperStyle={L.cols > 1 ? { gap: L.gap } : undefined}
+          style={
+            isWide
+              ? {
+                  width: '100%',
+                  maxWidth: CONTENT_MAX_WIDTH,
+                  alignSelf: 'center',
+                }
+              : undefined
+          }
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
             <ArtistHeader
@@ -120,18 +171,28 @@ export default function ArtistDetailScreen() {
               tab={tab}
               onTabChange={setTab}
               onPlayAll={handlePlayAll}
+              layout={L}
               colors={colors}
               design={design}
             />
           }
           renderItem={({ item }) => (
-            <AlbumTile album={item} colors={colors} design={design} />
+            <AlbumTile
+              album={item}
+              size={tileSize}
+              colors={colors}
+              design={design}
+            />
           )}
           ListEmptyComponent={
             <Text
               style={[
                 design.type.caption,
-                { color: colors.textMuted, textAlign: 'center', paddingVertical: 24 },
+                {
+                  color: colors.textMuted,
+                  textAlign: 'center',
+                  paddingVertical: 24,
+                },
               ]}
             >
               No albums
@@ -144,6 +205,15 @@ export default function ArtistDetailScreen() {
           data={artist.songs}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingBottom: 160 }}
+          style={
+            isWide
+              ? {
+                  width: '100%',
+                  maxWidth: CONTENT_MAX_WIDTH,
+                  alignSelf: 'center',
+                }
+              : undefined
+          }
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
             <ArtistHeader
@@ -151,90 +221,24 @@ export default function ArtistDetailScreen() {
               tab={tab}
               onTabChange={setTab}
               onPlayAll={handlePlayAll}
+              layout={L}
               colors={colors}
               design={design}
             />
           }
-          renderItem={({ item, index }) => {
-            const active = currentTrack?.id === item.id;
-            return (
-              <Pressable
-                onPress={() => playQueue(artist.songs, index)}
-                onLongPress={() => setActionSong(item)}
-                delayLongPress={400}
-                style={({ pressed }) => [
-                  styles.songRow,
-                  {
-                    paddingVertical: design.row.paddingVertical,
-                    borderBottomWidth: design.row.borderBottomWidth,
-                    borderBottomColor: design.row.borderBottomColor,
-                  },
-                  active && { backgroundColor: colors.rowActive },
-                  pressed && { opacity: 0.7 },
-                ]}
-              >
-                <View style={styles.songNumWrap}>
-                  {active && isPlaying ? (
-                    <Feather
-                      name="volume-2"
-                      size={14}
-                      color={colors.primary}
-                    />
-                  ) : (
-                    <Text
-                      style={[
-                        design.type.caption,
-                        {
-                          color: colors.textMuted,
-                          fontVariant: ['tabular-nums'],
-                        },
-                        active && { color: colors.primary },
-                      ]}
-                    >
-                      {index + 1}
-                    </Text>
-                  )}
-                </View>
-
-                <View style={{ flex: 1 }}>
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      design.type.body,
-                      { color: colors.text, fontWeight: '600' },
-                      active && { color: colors.primary },
-                    ]}
-                  >
-                    {item.title}
-                  </Text>
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      design.type.caption,
-                      { color: colors.textSecondary, marginTop: 2 },
-                    ]}
-                  >
-                    {item.album && item.album !== 'Unknown Album'
-                      ? item.album
-                      : 'Unknown Album'}
-                  </Text>
-                </View>
-
-                <Text
-                  style={[
-                    design.type.caption,
-                    {
-                      color: colors.textMuted,
-                      fontVariant: ['tabular-nums'],
-                      marginLeft: 8,
-                    },
-                  ]}
-                >
-                  {formatDuration(item.duration)}
-                </Text>
-              </Pressable>
-            );
-          }}
+          renderItem={({ item, index }) => (
+            <SongListRow
+              song={item}
+              index={index}
+              isActive={currentTrack?.id === item.id}
+              isPlaying={isPlaying}
+              layout={L}
+              colors={colors}
+              design={design}
+              onPress={() => playQueue(artist.songs, index)}
+              onMenu={() => setActionSong(item)}
+            />
+          )}
         />
       )}
 
@@ -249,11 +253,13 @@ export default function ArtistDetailScreen() {
   );
 }
 
+// ── Header ──────────────────────────────────────────────
 function ArtistHeader({
   artist,
   tab,
   onTabChange,
   onPlayAll,
+  layout,
   colors,
   design,
 }: {
@@ -261,10 +267,11 @@ function ArtistHeader({
   tab: Tab;
   onTabChange: (t: Tab) => void;
   onPlayAll: () => void;
+  layout: Layout;
   colors: any;
   design: any;
 }) {
-  const AVATAR_SIZE = 140;
+  const avatarSize = layout.avatarSize;
 
   return (
     <View style={styles.headerBlock}>
@@ -274,9 +281,9 @@ function ArtistHeader({
           style={[
             styles.avatarBig,
             {
-              width: AVATAR_SIZE,
-              height: AVATAR_SIZE,
-              borderRadius: AVATAR_SIZE / 2,
+              width: avatarSize,
+              height: avatarSize,
+              borderRadius: avatarSize / 2,
             },
           ]}
         />
@@ -285,16 +292,20 @@ function ArtistHeader({
           style={[
             styles.avatarBig,
             {
-              width: AVATAR_SIZE,
-              height: AVATAR_SIZE,
-              borderRadius: AVATAR_SIZE / 2,
+              width: avatarSize,
+              height: avatarSize,
+              borderRadius: avatarSize / 2,
               backgroundColor: colors.artPlaceholder,
               alignItems: 'center',
               justifyContent: 'center',
             },
           ]}
         >
-          <Feather name="user" size={48} color={colors.iconMuted} />
+          <Feather
+            name="user"
+            size={Math.round(avatarSize * 0.34)}
+            color={colors.iconMuted}
+          />
         </View>
       )}
 
@@ -320,99 +331,154 @@ function ArtistHeader({
         {artist.totalTracks === 1 ? 'track' : 'tracks'}
       </Text>
 
-      <Pressable
-        onPress={onPlayAll}
-        style={({ pressed }) => [
-          styles.playAllBtn,
-          {
-            backgroundColor: colors.primary,
-            borderRadius: design.radius.pill,
-          },
-          pressed && { opacity: 0.85 },
-        ]}
-      >
-        <Feather name="play" size={18} color={colors.primaryText} />
-        <Text
-          style={[
-            design.type.body,
-            { color: colors.primaryText, fontWeight: '700' },
-          ]}
-        >
-          Play all
-        </Text>
-      </Pressable>
+      <PlayAllButton onPress={onPlayAll} colors={colors} design={design} />
 
       <View style={styles.tabRow}>
-        {(['albums', 'songs'] as Tab[]).map((t) => {
-          const active = tab === t;
-          return (
-            <Pressable
-              key={t}
-              onPress={() => onTabChange(t)}
-              style={[
-                styles.tab,
-                {
-                  backgroundColor: colors.chipBg,
-                  borderRadius: design.radius.pill,
-                },
-                active && { backgroundColor: colors.chipBgActive },
-              ]}
-            >
-              <Text
-                style={[
-                  design.type.caption,
-                  { color: colors.chipText, fontWeight: '600' },
-                  active && {
-                    color: colors.chipTextActive,
-                    fontWeight: '700',
-                  },
-                ]}
-              >
-                {t.charAt(0).toUpperCase() + t.slice(1)}
-              </Text>
-            </Pressable>
-          );
-        })}
+        {(['albums', 'songs'] as Tab[]).map((t) => (
+          <HeaderTab
+            key={t}
+            label={t.charAt(0).toUpperCase() + t.slice(1)}
+            active={tab === t}
+            onPress={() => onTabChange(t)}
+            colors={colors}
+            design={design}
+          />
+        ))}
       </View>
     </View>
   );
 }
 
+function PlayAllButton({
+  onPress,
+  colors,
+  design,
+}: {
+  onPress: () => void;
+  colors: any;
+  design: any;
+}) {
+  const { hovered, hoverProps } = useHover();
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      style={[
+        styles.playAllBtn,
+        {
+          backgroundColor: colors.primary,
+          borderRadius: design.radius.pill,
+        },
+        hovered && { opacity: 0.9 },
+      ]}
+    >
+      <Feather name="play" size={18} color={colors.primaryText} />
+      <Text
+        style={[
+          design.type.body,
+          { color: colors.primaryText, fontWeight: '700' },
+        ]}
+      >
+        Play all
+      </Text>
+    </Pressable>
+  );
+}
+
+function HeaderTab({
+  label,
+  active,
+  onPress,
+  colors,
+  design,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+  colors: any;
+  design: any;
+}) {
+  const { hovered, hoverProps } = useHover();
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      style={[
+        styles.tab,
+        {
+          backgroundColor: colors.chipBg,
+          borderRadius: design.radius.pill,
+        },
+        active && { backgroundColor: colors.chipBgActive },
+        !active && hovered && { backgroundColor: colors.surfaceElevated },
+      ]}
+    >
+      <Text
+        style={[
+          design.type.caption,
+          { color: colors.chipText, fontWeight: '600' },
+          active && {
+            color: colors.chipTextActive,
+            fontWeight: '700',
+          },
+        ]}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+// ── Album tile ──────────────────────────────────────────
 function AlbumTile({
   album,
+  size,
   colors,
   design,
 }: {
   album: Album;
+  size: number;
   colors: any;
   design: any;
 }) {
+  const { hovered, hoverProps } = useHover();
+
   return (
     <Pressable
-      style={({ pressed }) => [styles.tile, pressed && { opacity: 0.7 }]}
+      {...hoverProps}
       onPress={() =>
         router.push({
           pathname: '/album/[key]',
           params: { key: encodeURIComponent(album.key) },
         } as any)
       }
+      style={[
+        { width: size, marginBottom: 12 },
+        hovered && Platform.OS === 'web' && { opacity: 0.85 },
+      ]}
     >
       {album.artwork ? (
         <Image
           source={{ uri: album.artwork }}
-          style={[styles.art, { borderRadius: design.radius.item + 2 }]}
+          style={{
+            width: size,
+            height: size,
+            borderRadius: design.radius.item + 2,
+            backgroundColor: colors.artPlaceholder,
+          }}
         />
       ) : (
         <View
-          style={[
-            styles.art,
-            {
-              borderRadius: design.radius.item + 2,
-              backgroundColor: colors.artPlaceholder,
-              alignItems: 'center',
-              justifyContent: 'center',
-            },
-          ]}
+          style={{
+            width: size,
+            height: size,
+            borderRadius: design.radius.item + 2,
+            backgroundColor: colors.artPlaceholder,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
         >
           <Feather name="disc" size={36} color={colors.iconMuted} />
         </View>
@@ -421,11 +487,7 @@ function AlbumTile({
         numberOfLines={1}
         style={[
           design.type.body,
-          {
-            color: colors.text,
-            fontWeight: '700',
-            marginTop: 8,
-          },
+          { color: colors.text, fontWeight: '700', marginTop: 8 },
         ]}
       >
         {album.title}
@@ -438,6 +500,108 @@ function AlbumTile({
         ]}
       >
         {album.songs.length} {album.songs.length === 1 ? 'track' : 'tracks'}
+      </Text>
+    </Pressable>
+  );
+}
+
+// ── Song list row ───────────────────────────────────────
+function SongListRow({
+  song,
+  index,
+  isActive,
+  isPlaying,
+  layout,
+  colors,
+  design,
+  onPress,
+  onMenu,
+}: {
+  song: Song;
+  index: number;
+  isActive: boolean;
+  isPlaying: boolean;
+  layout: Layout;
+  colors: any;
+  design: any;
+  onPress: () => void;
+  onMenu: () => void;
+}) {
+  const { hovered, hoverProps } = useHover();
+  const isWeb = Platform.OS === 'web';
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      onLongPress={onMenu}
+      delayLongPress={400}
+      style={[
+        styles.songRow,
+        {
+          paddingHorizontal: layout.hPad,
+          paddingVertical: layout.songRowVPad,
+        },
+        isActive && { backgroundColor: colors.rowActive },
+        !isActive && isWeb && hovered && {
+          backgroundColor: colors.surfaceElevated,
+        },
+      ]}
+    >
+      <View style={styles.songNumWrap}>
+        {isActive && isPlaying ? (
+          <Feather name="volume-2" size={14} color={colors.primary} />
+        ) : (
+          <Text
+            style={[
+              design.type.caption,
+              {
+                color: colors.textMuted,
+                fontVariant: ['tabular-nums'],
+              },
+              isActive && { color: colors.primary },
+            ]}
+          >
+            {index + 1}
+          </Text>
+        )}
+      </View>
+
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text
+          numberOfLines={1}
+          style={[
+            design.type.body,
+            { color: colors.text, fontWeight: '600' },
+            isActive && { color: colors.primary },
+          ]}
+        >
+          {song.title}
+        </Text>
+        <Text
+          numberOfLines={1}
+          style={[
+            design.type.caption,
+            { color: colors.textSecondary, marginTop: 2 },
+          ]}
+        >
+          {song.album && song.album !== 'Unknown Album'
+            ? song.album
+            : 'Unknown Album'}
+        </Text>
+      </View>
+
+      <Text
+        style={[
+          design.type.caption,
+          {
+            color: colors.textMuted,
+            fontVariant: ['tabular-nums'],
+            marginLeft: 8,
+          },
+        ]}
+      >
+        {formatDuration(song.duration)}
       </Text>
     </Pressable>
   );
@@ -464,7 +628,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 8,
     paddingVertical: 6,
   },
   iconBtn: {
@@ -512,18 +675,17 @@ const styles = StyleSheet.create({
   },
 
   gridContent: {
-    paddingHorizontal: H_PADDING,
     paddingBottom: 160,
-    gap: GAP,
   },
-  tile: { width: TILE_SIZE, marginBottom: GAP },
-  art: { width: TILE_SIZE, height: TILE_SIZE },
 
   songRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingHorizontal: 20,
   },
-  songNumWrap: { width: 24, alignItems: 'center', justifyContent: 'center' },
+  songNumWrap: {
+    width: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });
