@@ -10,6 +10,8 @@ import {
   Alert,
   Modal,
   ActivityIndicator,
+  Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -20,7 +22,13 @@ import { clearCache } from '../../../lib/metadata';
 import { resetOnboarding } from '../../../lib/onboarding';
 import { useLibrary } from '../../../hooks/useLibrary';
 import { useHeaderBack } from '../../../hooks/useHeaderBack';
+import { useHover } from '../../../hooks/useHover';
 import MiniPlayer from '../../../components/MiniPlayer';
+
+// Settings is a narrow column of sections. Cap at 720 so it
+// doesn't stretch edge-to-edge on a wide browser, but keep it
+// wider than a phone for comfortable line lengths.
+const CONTENT_MAX_WIDTH = 720;
 
 type IconName = React.ComponentProps<typeof Feather>['name'];
 type Colors = ReturnType<typeof useTheme>['colors'];
@@ -47,6 +55,9 @@ export default function SettingsScreen() {
   const { refresh, songs } = useLibrary();
   const [busy, setBusy] = useState<string | null>(null);
   const [durationOpen, setDurationOpen] = useState(false);
+
+  const { width } = useWindowDimensions();
+  const isWide = width >= 900;
 
   useHeaderBack('Settings');
 
@@ -119,164 +130,152 @@ export default function SettingsScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <Section title="Appearance" colors={colors} design={design}>
-          <Row colors={colors} design={design} noDivider>
-            <RowIcon name="moon" colors={colors} design={design} />
-            <RowLabel colors={colors} design={design}>
-              Theme
-            </RowLabel>
-          </Row>
-          <View style={styles.segmentRow}>
-            {(['system', 'light', 'dark'] as const).map((mode) => {
-              const active = settings.theme === mode;
-              return (
-                <Pressable
-                  key={mode}
-                  onPress={() => updateSetting('theme', mode)}
-                  style={[
-                    styles.segment,
-                    {
-                      backgroundColor: colors.chipBg,
-                      borderRadius: design.radius.item,
-                    },
-                    active && { backgroundColor: colors.primary },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      design.type.caption,
-                      { color: colors.chipText, fontWeight: '600' },
-                      active && {
-                        color: colors.primaryText,
-                        fontWeight: '700',
-                      },
-                    ]}
-                  >
-                    {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </Section>
-
-        <Section title="Playback" colors={colors} design={design}>
-          <ToggleRow
-            icon="play-circle"
-            label="Continue playback"
-            description="Keep playing when the app is closed"
-            value={settings.continuePlaybackOnKill}
-            onChange={(v) => updateSetting('continuePlaybackOnKill', v)}
-            colors={colors}
-            design={design}
-          />
-          <ToggleRow
-            icon="headphones"
-            label="Headphone controls"
-            description="Pause and skip with your headset buttons"
-            value={settings.headphoneControls}
-            onChange={(v) => updateSetting('headphoneControls', v)}
-            colors={colors}
-            design={design}
-          />
-          <ToggleRow
-            icon="skip-forward"
-            label="Autoplay next track"
-            description="Continue to the next song automatically"
-            value={settings.autoplayNext}
-            onChange={(v) => updateSetting('autoplayNext', v)}
-            colors={colors}
-            design={design}
-            last
-          />
-        </Section>
-
-        <Section title="Library" colors={colors} design={design}>
-          <ActionRow
-            icon="filter"
-            label="Hide short songs"
-            description={describeDuration(settings.minSongDuration)}
-            onPress={() => setDurationOpen(true)}
-            colors={colors}
-            design={design}
-          />
-          <ActionRow
-            icon="refresh-cw"
-            label="Rescan library"
-            description="Look for new audio files"
-            busy={busy === 'rescan'}
-            onPress={runRescan}
-            colors={colors}
-            design={design}
-          />
-          <ActionRow
-            icon="trash-2"
-            label="Clear metadata cache"
-            description="Force a re-read of ID3 tags"
-            busy={busy === 'clear-cache'}
-            onPress={runClearCache}
-            colors={colors}
-            design={design}
-          />
-          <ToggleRow
-            icon="eye-off"
-            label="Show hidden files"
-            description="Include files in hidden folders"
-            value={settings.showHiddenFiles}
-            onChange={(v) => updateSetting('showHiddenFiles', v)}
-            colors={colors}
-            design={design}
-            last
-          />
-        </Section>
-
-        <Section title="About" colors={colors} design={design}>
-          <ActionRow
-            icon="info"
-            label="Version"
-            description={Constants.expoConfig?.version ?? '—'}
-            colors={colors}
-            design={design}
-          />
-          <ActionRow
-            icon="play-circle"
-            label="Show welcome screen again"
-            description="Replay the onboarding flow"
-            onPress={runShowWelcome}
-            colors={colors}
-            design={design}
-          />
-          <ActionRow
-            icon="rotate-ccw"
-            label="Reset settings"
-            description="Return all preferences to defaults"
-            destructive
-            onPress={runResetSettings}
-            colors={colors}
-            design={design}
-          />
-          <ActionRow
-            icon="file-text"
-            label="Tracks in library"
-            description={`${songs.length} on this device`}
-            colors={colors}
-            design={design}
-            last
-          />
-        </Section>
-
-        <Text
-          style={[
-            design.type.caption,
-            {
-              color: colors.textMuted,
-              textAlign: 'center',
-              marginTop: 32,
-            },
-          ]}
+        <View
+          style={{
+            width: '100%',
+            maxWidth: isWide ? CONTENT_MAX_WIDTH : width,
+            alignSelf: 'center',
+          }}
         >
-          Made with React Native + Expo
-        </Text>
+          <Section title="Appearance" colors={colors} design={design}>
+            <Row colors={colors} design={design} noDivider>
+              <RowIcon name="moon" colors={colors} design={design} />
+              <RowLabel colors={colors} design={design}>
+                Theme
+              </RowLabel>
+            </Row>
+            <View style={styles.segmentRow}>
+              {(['system', 'light', 'dark'] as const).map((mode) => (
+                <ThemeSegment
+                  key={mode}
+                  mode={mode}
+                  active={settings.theme === mode}
+                  onPress={() => updateSetting('theme', mode)}
+                  colors={colors}
+                  design={design}
+                />
+              ))}
+            </View>
+          </Section>
+
+          <Section title="Playback" colors={colors} design={design}>
+            <ToggleRow
+              icon="play-circle"
+              label="Continue playback"
+              description="Keep playing when the app is closed"
+              value={settings.continuePlaybackOnKill}
+              onChange={(v) => updateSetting('continuePlaybackOnKill', v)}
+              colors={colors}
+              design={design}
+            />
+            <ToggleRow
+              icon="headphones"
+              label="Headphone controls"
+              description="Pause and skip with your headset buttons"
+              value={settings.headphoneControls}
+              onChange={(v) => updateSetting('headphoneControls', v)}
+              colors={colors}
+              design={design}
+            />
+            <ToggleRow
+              icon="skip-forward"
+              label="Autoplay next track"
+              description="Continue to the next song automatically"
+              value={settings.autoplayNext}
+              onChange={(v) => updateSetting('autoplayNext', v)}
+              colors={colors}
+              design={design}
+              last
+            />
+          </Section>
+
+          <Section title="Library" colors={colors} design={design}>
+            <ActionRow
+              icon="filter"
+              label="Hide short songs"
+              description={describeDuration(settings.minSongDuration)}
+              onPress={() => setDurationOpen(true)}
+              colors={colors}
+              design={design}
+            />
+            <ActionRow
+              icon="refresh-cw"
+              label="Rescan library"
+              description="Look for new audio files"
+              busy={busy === 'rescan'}
+              onPress={runRescan}
+              colors={colors}
+              design={design}
+            />
+            <ActionRow
+              icon="trash-2"
+              label="Clear metadata cache"
+              description="Force a re-read of ID3 tags"
+              busy={busy === 'clear-cache'}
+              onPress={runClearCache}
+              colors={colors}
+              design={design}
+            />
+            <ToggleRow
+              icon="eye-off"
+              label="Show hidden files"
+              description="Include files in hidden folders"
+              value={settings.showHiddenFiles}
+              onChange={(v) => updateSetting('showHiddenFiles', v)}
+              colors={colors}
+              design={design}
+              last
+            />
+          </Section>
+
+          <Section title="About" colors={colors} design={design}>
+            <ActionRow
+              icon="info"
+              label="Version"
+              description={Constants.expoConfig?.version ?? '—'}
+              colors={colors}
+              design={design}
+            />
+            <ActionRow
+              icon="play-circle"
+              label="Show welcome screen again"
+              description="Replay the onboarding flow"
+              onPress={runShowWelcome}
+              colors={colors}
+              design={design}
+            />
+            <ActionRow
+              icon="rotate-ccw"
+              label="Reset settings"
+              description="Return all preferences to defaults"
+              destructive
+              onPress={runResetSettings}
+              colors={colors}
+              design={design}
+            />
+            <ActionRow
+              icon="file-text"
+              label="Tracks in library"
+              description={`${songs.length} on this device`}
+              colors={colors}
+              design={design}
+              last
+            />
+          </Section>
+
+          <Text
+            style={[
+              design.type.caption,
+              {
+                color: colors.textMuted,
+                textAlign: 'center',
+                marginTop: 32,
+              },
+            ]}
+          >
+            Made with React Native + Expo
+          </Text>
+        </View>
       </ScrollView>
 
       <Modal
@@ -314,67 +313,27 @@ export default function SettingsScreen() {
               Songs below this duration won't appear in your library.
             </Text>
 
-            {DURATION_OPTIONS.map((opt, i) => {
-              const active = settings.minSongDuration === opt.value;
-              const isLast = i === DURATION_OPTIONS.length - 1;
-              return (
-                <Pressable
-                  key={opt.value}
-                  onPress={() => {
-                    updateSetting('minSongDuration', opt.value);
-                    setDurationOpen(false);
-                  }}
-                  style={({ pressed }) => [
-                    styles.optionRow,
-                    !isLast && {
-                      borderBottomWidth: StyleSheet.hairlineWidth,
-                      borderBottomColor: colors.borderSubtle,
-                    },
-                    pressed && { backgroundColor: colors.surfaceElevated },
-                  ]}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={[
-                        design.type.body,
-                        {
-                          color: active ? colors.primary : colors.text,
-                          fontWeight: active ? '700' : '600',
-                        },
-                      ]}
-                    >
-                      {opt.label}
-                    </Text>
-                    <Text
-                      style={[
-                        design.type.caption,
-                        { color: colors.textMuted, marginTop: 2 },
-                      ]}
-                    >
-                      {opt.description}
-                    </Text>
-                  </View>
-                  {active && (
-                    <Feather name="check" size={20} color={colors.primary} />
-                  )}
-                </Pressable>
-              );
-            })}
+            {DURATION_OPTIONS.map((opt, i) => (
+              <DurationOption
+                key={opt.value}
+                label={opt.label}
+                description={opt.description}
+                active={settings.minSongDuration === opt.value}
+                isLast={i === DURATION_OPTIONS.length - 1}
+                onPress={() => {
+                  updateSetting('minSongDuration', opt.value);
+                  setDurationOpen(false);
+                }}
+                colors={colors}
+                design={design}
+              />
+            ))}
 
-            <Pressable
+            <ModalCancelButton
               onPress={() => setDurationOpen(false)}
-              style={[
-                styles.modalBtn,
-                {
-                  backgroundColor: colors.chipBg,
-                  borderRadius: design.radius.item,
-                },
-              ]}
-            >
-              <Text style={[design.type.body, { color: colors.text }]}>
-                Cancel
-              </Text>
-            </Pressable>
+              colors={colors}
+              design={design}
+            />
           </View>
         </View>
       </Modal>
@@ -384,7 +343,147 @@ export default function SettingsScreen() {
   );
 }
 
-// ── Building blocks ──────────────────────────────────────
+// ── Theme segment ───────────────────────────────────────
+function ThemeSegment({
+  mode,
+  active,
+  onPress,
+  colors,
+  design,
+}: {
+  mode: 'system' | 'light' | 'dark';
+  active: boolean;
+  onPress: () => void;
+  colors: Colors;
+  design: Design;
+}) {
+  const { hovered, hoverProps } = useHover();
+  const isWeb = Platform.OS === 'web';
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      style={[
+        styles.segment,
+        {
+          backgroundColor: colors.chipBg,
+          borderRadius: design.radius.item,
+        },
+        active && { backgroundColor: colors.primary },
+        !active && isWeb && hovered && {
+          backgroundColor: colors.surfaceElevated,
+        },
+      ]}
+    >
+      <Text
+        style={[
+          design.type.caption,
+          { color: colors.chipText, fontWeight: '600' },
+          active && {
+            color: colors.primaryText,
+            fontWeight: '700',
+          },
+        ]}
+      >
+        {mode.charAt(0).toUpperCase() + mode.slice(1)}
+      </Text>
+    </Pressable>
+  );
+}
+
+// ── Duration option ─────────────────────────────────────
+function DurationOption({
+  label,
+  description,
+  active,
+  isLast,
+  onPress,
+  colors,
+  design,
+}: {
+  label: string;
+  description: string;
+  active: boolean;
+  isLast: boolean;
+  onPress: () => void;
+  colors: Colors;
+  design: Design;
+}) {
+  const { hovered, hoverProps } = useHover();
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      style={[
+        styles.optionRow,
+        !isLast && {
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.borderSubtle,
+        },
+        hovered && { backgroundColor: colors.surfaceElevated },
+      ]}
+    >
+      <View style={{ flex: 1 }}>
+        <Text
+          style={[
+            design.type.body,
+            {
+              color: active ? colors.primary : colors.text,
+              fontWeight: active ? '700' : '600',
+            },
+          ]}
+        >
+          {label}
+        </Text>
+        <Text
+          style={[
+            design.type.caption,
+            { color: colors.textMuted, marginTop: 2 },
+          ]}
+        >
+          {description}
+        </Text>
+      </View>
+      {active && (
+        <Feather name="check" size={20} color={colors.primary} />
+      )}
+    </Pressable>
+  );
+}
+
+// ── Modal cancel ────────────────────────────────────────
+function ModalCancelButton({
+  onPress,
+  colors,
+  design,
+}: {
+  onPress: () => void;
+  colors: Colors;
+  design: Design;
+}) {
+  const { hovered, hoverProps } = useHover();
+
+  return (
+    <Pressable
+      {...hoverProps}
+      onPress={onPress}
+      style={[
+        styles.modalBtn,
+        {
+          backgroundColor: colors.chipBg,
+          borderRadius: design.radius.item,
+        },
+        hovered && { opacity: 0.9 },
+      ]}
+    >
+      <Text style={[design.type.body, { color: colors.text }]}>Cancel</Text>
+    </Pressable>
+  );
+}
+
+// ── Building blocks ─────────────────────────────────────
 
 function Section({
   title,
@@ -579,19 +678,25 @@ function ActionRow({
   design: Design;
   last?: boolean;
 }) {
+  const { hovered, hoverProps } = useHover();
   const disabled = !onPress || busy;
+  const isWeb = Platform.OS === 'web';
+
   return (
     <Pressable
+      {...hoverProps}
       onPress={onPress}
       disabled={disabled}
-      style={({ pressed }) => [
+      style={[
         styles.row,
         !last &&
           design.showRowDividers && {
             borderBottomWidth: StyleSheet.hairlineWidth,
             borderBottomColor: colors.borderSubtle,
           },
-        pressed && onPress && { opacity: 0.6 },
+        !disabled && isWeb && hovered && {
+          backgroundColor: colors.surfaceElevated,
+        },
       ]}
     >
       <RowIcon
@@ -683,6 +788,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 14,
+    paddingHorizontal: 12,
+    marginHorizontal: -12,
+    borderRadius: 10,
     gap: 12,
   },
   modalBtn: {
