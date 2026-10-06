@@ -7,11 +7,12 @@ import {
   Pressable,
   StyleSheet,
   Image,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { router, useNavigation } from 'expo-router';
-import { DrawerActions } from "expo-router/react-navigation";
+import { DrawerActions } from 'expo-router/react-navigation';
 import { useProfile } from '../../../hooks/useProfile';
 import { usePlaylists } from '../../../hooks/usePlaylists';
 import { useLibrary, type Song } from '../../../hooks/useLibrary';
@@ -19,6 +20,16 @@ import { useRecentlyAdded } from '../../../hooks/useRecentlyAdded';
 import { useTheme } from '../../../context/ThemeContext';
 import { usePlayer } from '../../../context/PlayerContext';
 import MiniPlayer from '../../../components/MiniPlayer';
+
+// Content is capped at this width and centered on wide viewports,
+// so text doesn't stretch edge-to-edge on desktop browsers.
+const CONTENT_MAX_WIDTH = 1200;
+
+// Horizontal padding inside the content wrapper. Wider on large
+// screens so the content isn't flush against the container edges.
+function contentPadding(isWide: boolean) {
+  return isWide ? 32 : 20;
+}
 
 function relativeTime(ms: number): string {
   const diff = Date.now() - ms;
@@ -39,6 +50,20 @@ export default function HomeScreen() {
   const { playQueue, recentIds, playCounts } = usePlayer();
   const navigation = useNavigation();
 
+  // ── Responsive ─────────────────────────────────────────
+  // Breakpoints:
+  //   compact  < 500   phone portrait
+  //   medium  500-899  phone landscape / small tablet
+  //   wide     >= 900  tablet landscape / desktop browser
+  const { width } = useWindowDimensions();
+  const isCompact = width < 500;
+  const isMedium = width >= 500 && width < 900;
+  const isWide = width >= 900;
+
+  const tileSize = isCompact ? 130 : isMedium ? 150 : 180;
+  const greetingSize = isCompact ? 34 : isMedium ? 40 : 46;
+  const hPad = contentPadding(isWide);
+
   useLayoutEffect(() => {
     navigation.setOptions({ headerShown: false });
   }, [navigation]);
@@ -50,11 +75,6 @@ export default function HomeScreen() {
   }, [navigation]);
 
   // ── Time-based greeting ────────────────────────────────
-  // Computed once on mount. A typical session is minutes long,
-  // so the boundary case (user leaves the app open across noon)
-  // is not worth a timer. "Good night" bookends the very late
-  // and very early hours, matching the convention every music
-  // app uses.
   const greeting = useMemo(() => {
     const h = new Date().getHours();
     if (h < 5) return 'Good night';
@@ -166,215 +186,259 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Header ────────────────────────────────────── */}
-        <View style={styles.header}>
-          <Pressable
-            onPress={openDrawer}
-            hitSlop={10}
+        {/* Content wrapper — caps width and centers on wide
+            viewports. All inner sections use the same padding
+            value so they align to the same gutter. */}
+        <View
+          style={{
+            width: '100%',
+            maxWidth: CONTENT_MAX_WIDTH,
+            alignSelf: 'center',
+          }}
+        >
+          {/* ── Header ──────────────────────────────────── */}
+          <View style={[styles.header, { paddingHorizontal: hPad }]}>
+            <Pressable
+              onPress={openDrawer}
+              hitSlop={10}
+              style={[
+                styles.headerIconBtn,
+                { backgroundColor: colors.chipBg },
+              ]}
+            >
+              <Feather name="menu" size={22} color={colors.icon} />
+            </Pressable>
+
+            <View style={styles.headerActions}>
+              <Pressable
+                onPress={() => router.push('/library')}
+                style={[
+                  styles.headerIconBtn,
+                  { backgroundColor: colors.chipBg },
+                ]}
+                hitSlop={6}
+              >
+                <Feather name="search" size={20} color={colors.icon} />
+              </Pressable>
+              <Pressable
+                onPress={() => router.push('/favorites')}
+                style={[
+                  styles.headerIconBtn,
+                  { backgroundColor: colors.chipBg },
+                ]}
+                hitSlop={6}
+              >
+                <Feather name="heart" size={20} color={colors.icon} />
+              </Pressable>
+            </View>
+          </View>
+
+          <Text
             style={[
-              styles.headerIconBtn,
-              { backgroundColor: colors.chipBg },
+              styles.greeting,
+              {
+                color: colors.text,
+                fontSize: greetingSize,
+                paddingHorizontal: hPad,
+              },
             ]}
           >
-            <Feather name="menu" size={22} color={colors.icon} />
-          </Pressable>
-
-          <View style={styles.headerActions}>
-            <Pressable
-              onPress={() => router.push('/library')}
-              style={[
-                styles.headerIconBtn,
-                { backgroundColor: colors.chipBg },
-              ]}
-              hitSlop={6}
-            >
-              <Feather name="search" size={20} color={colors.icon} />
-            </Pressable>
-            <Pressable
-              onPress={() => router.push('/favorites')}
-              style={[
-                styles.headerIconBtn,
-                { backgroundColor: colors.chipBg },
-              ]}
-              hitSlop={6}
-            >
-              <Feather name="heart" size={20} color={colors.icon} />
-            </Pressable>
-          </View>
-        </View>
-
-        <Text style={[styles.greeting, { color: colors.text }]}>
-          {greeting}, <Text style={styles.greetingName}>{firstName}</Text>
-        </Text>
-
-        {/* ── Today's pick ─────────────────────────────── */}
-        {todaysPick && (
-          <Section title="Today's pick">
-            <FeaturedCard
-              title={todaysPick.title}
-              subtitle={todaysPick.subtitle}
-              artwork={todaysPick.artwork}
-              colors={colors}
-              design={design}
-              onPlay={handlePickPlay}
-            />
-          </Section>
-        )}
-
-        {/* ── Recently played ──────────────────────────── */}
-        {recentSongs.length > 0 && (
-          <Section
-            title="Recently played"
-            onSeeAll={() => router.push('/recently-played')}
-          >
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.tileRow}
-            >
-              {recentSongs.map((song, index) => (
-                <SongTile
-                  key={song.id}
-                  song={song}
-                  subtitle={song.artist}
-                  colors={colors}
-                  design={design}
-                  onPress={() => playQueue(recentSongs, index)}
-                />
-              ))}
-            </ScrollView>
-          </Section>
-        )}
-
-        {/* ── Top tracks ───────────────────────────────── */}
-        {topTracks.length > 0 && (
-          <Section
-            title="Your top tracks"
-            onSeeAll={() => router.push('/top-tracks')}
-          >
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.tileRow}
-            >
-              {topTracks.map(({ song }, index) => (
-                <SongTile
-                  key={song.id}
-                  song={song}
-                  subtitle={song.artist}
-                  rank={index + 1}
-                  colors={colors}
-                  design={design}
-                  onPress={() =>
-                    playQueue(
-                      topTracks.map((t) => t.song),
-                      index
-                    )
-                  }
-                />
-              ))}
-            </ScrollView>
-          </Section>
-        )}
-
-        {/* ── Recently added ───────────────────────────── */}
-        {recentlyAddedTop.length > 0 && (
-          <Section
-            title="Recently added"
-            onSeeAll={() => router.push('/recently-added')}
-          >
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.tileRow}
-            >
-              {recentlyAddedTop.map(({ song, addedAt }, index) => (
-                <SongTile
-                  key={song.id}
-                  song={song}
-                  subtitle={relativeTime(addedAt)}
-                  colors={colors}
-                  design={design}
-                  onPress={() =>
-                    playQueue(
-                      recentlyAddedTop.map((r) => r.song),
-                      index
-                    )
-                  }
-                />
-              ))}
-            </ScrollView>
-          </Section>
-        )}
-
-        {/* ── Top daily playlists ──────────────────────── */}
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Top daily playlists
+            {greeting}, <Text style={styles.greetingName}>{firstName}</Text>
           </Text>
-          <Pressable onPress={() => router.push('/playlists')} hitSlop={8}>
-            <Text
-              style={[
-                design.type.caption,
-                { color: colors.textSecondary, fontWeight: '600' },
-              ]}
-            >
-              See all
-            </Text>
-          </Pressable>
-        </View>
 
-        <View style={{ marginTop: 12 }}>
-          {playlists.length === 0 ? (
-            <View
-              style={[
-                styles.emptyPlaylists,
-                {
-                  backgroundColor: colors.surface,
-                  borderRadius: design.radius.card,
-                },
-              ]}
+          {/* ── Today's pick ────────────────────────────── */}
+          {todaysPick && (
+            <Section
+              title="Today's pick"
+              paddingHorizontal={hPad}
             >
-              <Feather name="list" size={28} color={colors.iconMuted} />
-              <Text
-                style={[
-                  design.type.body,
-                  { color: colors.text, marginTop: 10, fontWeight: '600' },
+              <FeaturedCard
+                title={todaysPick.title}
+                subtitle={todaysPick.subtitle}
+                artwork={todaysPick.artwork}
+                colors={colors}
+                design={design}
+                paddingHorizontal={hPad}
+                wide={isWide}
+                onPlay={handlePickPlay}
+              />
+            </Section>
+          )}
+
+          {/* ── Recently played ─────────────────────────── */}
+          {recentSongs.length > 0 && (
+            <Section
+              title="Recently played"
+              onSeeAll={() => router.push('/recently-played')}
+              paddingHorizontal={hPad}
+            >
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={[
+                  styles.tileRow,
+                  { paddingHorizontal: hPad },
                 ]}
               >
-                No playlists yet
-              </Text>
+                {recentSongs.map((song, index) => (
+                  <SongTile
+                    key={song.id}
+                    song={song}
+                    subtitle={song.artist}
+                    size={tileSize}
+                    colors={colors}
+                    design={design}
+                    onPress={() => playQueue(recentSongs, index)}
+                  />
+                ))}
+              </ScrollView>
+            </Section>
+          )}
+
+          {/* ── Top tracks ──────────────────────────────── */}
+          {topTracks.length > 0 && (
+            <Section
+              title="Your top tracks"
+              onSeeAll={() => router.push('/top-tracks')}
+              paddingHorizontal={hPad}
+            >
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={[
+                  styles.tileRow,
+                  { paddingHorizontal: hPad },
+                ]}
+              >
+                {topTracks.map(({ song }, index) => (
+                  <SongTile
+                    key={song.id}
+                    song={song}
+                    subtitle={song.artist}
+                    rank={index + 1}
+                    size={tileSize}
+                    colors={colors}
+                    design={design}
+                    onPress={() =>
+                      playQueue(
+                        topTracks.map((t) => t.song),
+                        index
+                      )
+                    }
+                  />
+                ))}
+              </ScrollView>
+            </Section>
+          )}
+
+          {/* ── Recently added ──────────────────────────── */}
+          {recentlyAddedTop.length > 0 && (
+            <Section
+              title="Recently added"
+              onSeeAll={() => router.push('/recently-added')}
+              paddingHorizontal={hPad}
+            >
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={[
+                  styles.tileRow,
+                  { paddingHorizontal: hPad },
+                ]}
+              >
+                {recentlyAddedTop.map(({ song, addedAt }, index) => (
+                  <SongTile
+                    key={song.id}
+                    song={song}
+                    subtitle={relativeTime(addedAt)}
+                    size={tileSize}
+                    colors={colors}
+                    design={design}
+                    onPress={() =>
+                      playQueue(
+                        recentlyAddedTop.map((r) => r.song),
+                        index
+                      )
+                    }
+                  />
+                ))}
+              </ScrollView>
+            </Section>
+          )}
+
+          {/* ── Top daily playlists ─────────────────────── */}
+          <View
+            style={[styles.sectionHeader, { paddingHorizontal: hPad }]}
+          >
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Top daily playlists
+            </Text>
+            <Pressable onPress={() => router.push('/playlists')} hitSlop={8}>
               <Text
                 style={[
                   design.type.caption,
+                  { color: colors.textSecondary, fontWeight: '600' },
+                ]}
+              >
+                See all
+              </Text>
+            </Pressable>
+          </View>
+
+          <View style={{ marginTop: 12 }}>
+            {playlists.length === 0 ? (
+              <View
+                style={[
+                  styles.emptyPlaylists,
                   {
-                    color: colors.textSecondary,
-                    marginTop: 4,
-                    textAlign: 'center',
+                    backgroundColor: colors.surface,
+                    borderRadius: design.radius.card,
+                    marginHorizontal: hPad,
                   },
                 ]}
               >
-                Create one to see it here.
-              </Text>
-            </View>
-          ) : (
-            playlists.slice(0, 5).map((p) => {
-              const resolved = resolvePlaylistSongs(p.trackUris);
-              return (
-                <PlaylistRow
-                  key={p.id}
-                  name={p.name}
-                  songs={resolved}
-                  colors={colors}
-                  design={design}
-                  onPress={() => router.push(`/playlist/${p.id}`)}
-                  onPlay={() => {
-                    if (resolved.length) playQueue(resolved, 0);
-                  }}
-                />
-              );
-            })
-          )}
+                <Feather name="list" size={28} color={colors.iconMuted} />
+                <Text
+                  style={[
+                    design.type.body,
+                    { color: colors.text, marginTop: 10, fontWeight: '600' },
+                  ]}
+                >
+                  No playlists yet
+                </Text>
+                <Text
+                  style={[
+                    design.type.caption,
+                    {
+                      color: colors.textSecondary,
+                      marginTop: 4,
+                      textAlign: 'center',
+                    },
+                  ]}
+                >
+                  Create one to see it here.
+                </Text>
+              </View>
+            ) : (
+              playlists.slice(0, 5).map((p) => {
+                const resolved = resolvePlaylistSongs(p.trackUris);
+                return (
+                  <PlaylistRow
+                    key={p.id}
+                    name={p.name}
+                    songs={resolved}
+                    colors={colors}
+                    design={design}
+                    paddingHorizontal={hPad}
+                    onPress={() => router.push(`/playlist/${p.id}`)}
+                    onPlay={() => {
+                      if (resolved.length) playQueue(resolved, 0);
+                    }}
+                  />
+                );
+              })
+            )}
+          </View>
         </View>
       </ScrollView>
 
@@ -387,16 +451,23 @@ export default function HomeScreen() {
 function Section({
   title,
   onSeeAll,
+  paddingHorizontal,
   children,
 }: {
   title: string;
   onSeeAll?: () => void;
+  paddingHorizontal: number;
   children: React.ReactNode;
 }) {
   const { colors, design } = useTheme();
   return (
     <>
-      <View style={styles.sectionHeader}>
+      <View
+        style={[
+          styles.sectionHeader,
+          { paddingHorizontal },
+        ]}
+      >
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
           {title}
         </Text>
@@ -423,6 +494,7 @@ function SongTile({
   song,
   subtitle,
   rank,
+  size,
   colors,
   design,
   onPress,
@@ -430,6 +502,7 @@ function SongTile({
   song: Song;
   subtitle: string;
   rank?: number;
+  size: number;
   colors: any;
   design: any;
   onPress: () => void;
@@ -438,7 +511,7 @@ function SongTile({
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
-        styles.tile,
+        { width: size },
         pressed && { opacity: 0.7 },
       ]}
     >
@@ -449,6 +522,8 @@ function SongTile({
             style={[
               styles.tileArt,
               {
+                width: size,
+                height: size,
                 borderRadius: design.radius.item,
                 backgroundColor: colors.artPlaceholder,
               },
@@ -459,6 +534,8 @@ function SongTile({
             style={[
               styles.tileArt,
               {
+                width: size,
+                height: size,
                 borderRadius: design.radius.item,
                 backgroundColor: colors.artPlaceholder,
                 alignItems: 'center',
@@ -477,10 +554,7 @@ function SongTile({
             ]}
           >
             <Text
-              style={[
-                styles.rankText,
-                { color: colors.primaryText },
-              ]}
+              style={[styles.rankText, { color: colors.primaryText }]}
             >
               {rank}
             </Text>
@@ -516,6 +590,8 @@ function FeaturedCard({
   artwork,
   colors,
   design,
+  paddingHorizontal,
+  wide,
   onPlay,
 }: {
   title: string;
@@ -523,23 +599,32 @@ function FeaturedCard({
   artwork?: string;
   colors: any;
   design: any;
+  paddingHorizontal: number;
+  wide: boolean;
   onPlay: () => void;
 }) {
+  const minHeight = wide ? 220 : 170;
+  const artWidth = wide ? 260 : 150;
+  const titleSize = wide ? 28 : 22;
+  const innerPad = wide ? 28 : 20;
+
   return (
     <View
       style={[
         styles.featuredCard,
         {
+          marginHorizontal: paddingHorizontal,
+          minHeight,
           backgroundColor: colors.rowActive,
           borderRadius: design.radius.card + 6,
         },
       ]}
     >
-      <View style={styles.featuredLeft}>
+      <View style={[styles.featuredLeft, { padding: innerPad }]}>
         <Text
           style={[
             design.type.title,
-            { color: colors.text, fontWeight: '800', fontSize: 22 },
+            { color: colors.text, fontWeight: '800', fontSize: titleSize },
           ]}
           numberOfLines={2}
         >
@@ -593,6 +678,8 @@ function FeaturedCard({
           style={[
             styles.featuredArt,
             {
+              width: artWidth,
+              minHeight,
               borderTopRightRadius: design.radius.card + 6,
               borderBottomRightRadius: design.radius.card + 6,
             },
@@ -603,6 +690,8 @@ function FeaturedCard({
           style={[
             styles.featuredArt,
             {
+              width: artWidth,
+              minHeight,
               backgroundColor: colors.artPlaceholder,
               borderTopRightRadius: design.radius.card + 6,
               borderBottomRightRadius: design.radius.card + 6,
@@ -620,6 +709,7 @@ function PlaylistRow({
   songs,
   colors,
   design,
+  paddingHorizontal,
   onPress,
   onPlay,
 }: {
@@ -627,6 +717,7 @@ function PlaylistRow({
   songs: Song[];
   colors: any;
   design: any;
+  paddingHorizontal: number;
   onPress: () => void;
   onPlay: () => void;
 }) {
@@ -639,6 +730,7 @@ function PlaylistRow({
       onPress={onPress}
       style={({ pressed }) => [
         styles.playlistRow,
+        { paddingHorizontal },
         pressed && { opacity: 0.7 },
       ]}
     >
@@ -713,7 +805,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
     paddingTop: 4,
   },
   headerActions: {
@@ -730,10 +821,8 @@ const styles = StyleSheet.create({
   },
 
   greeting: {
-    fontSize: 34,
     fontWeight: '800',
     letterSpacing: -0.5,
-    paddingHorizontal: 20,
     marginTop: 20,
   },
   greetingName: { fontWeight: '400' },
@@ -743,7 +832,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
     marginTop: 28,
   },
   sectionTitle: {
@@ -752,14 +840,12 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
 
-  // ── Tiles (recent / top / added) ─────────────────────
+  // ── Tiles ────────────────────────────────────────────
   tileRow: {
-    paddingHorizontal: 20,
     paddingTop: 14,
     gap: 14,
   },
-  tile: { width: 130 },
-  tileArt: { width: 130, height: 130 },
+  tileArt: {},
   rankBadge: {
     position: 'absolute',
     top: 8,
@@ -779,14 +865,11 @@ const styles = StyleSheet.create({
   // ── Featured card ────────────────────────────────────
   featuredCard: {
     flexDirection: 'row',
-    marginHorizontal: 20,
     marginTop: 14,
-    minHeight: 170,
     overflow: 'hidden',
   },
   featuredLeft: {
     flex: 1,
-    padding: 20,
     justifyContent: 'space-between',
   },
   featuredActions: {
@@ -804,9 +887,7 @@ const styles = StyleSheet.create({
   },
   featuredIcon: { padding: 4 },
   featuredArt: {
-    width: 150,
     height: '100%',
-    minHeight: 170,
   },
 
   // ── Playlist rows ────────────────────────────────────
@@ -814,7 +895,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    paddingHorizontal: 20,
     paddingVertical: 10,
   },
   playlistArt: {
@@ -832,7 +912,6 @@ const styles = StyleSheet.create({
   },
 
   emptyPlaylists: {
-    marginHorizontal: 20,
     padding: 28,
     alignItems: 'center',
     justifyContent: 'center',

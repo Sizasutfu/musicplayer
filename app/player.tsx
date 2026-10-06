@@ -1,13 +1,13 @@
 // app/player.tsx
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
   Pressable,
   StyleSheet,
-  Dimensions,
   ScrollView,
   Image,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -19,8 +19,9 @@ import SeekBar from '../components/SeekBar';
 import LikeButton from '../components/LikeButton';
 import WaveformVisualizer from '../components/WaveformVisualizer';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const ART_SIZE = Math.min(SCREEN_WIDTH - 64, 340);
+// Same content cap as the home screen so the player stays consistent
+// with the rest of the app on wide viewports.
+const CONTENT_MAX_WIDTH = 720;
 
 function formatTime(seconds: number) {
   if (!seconds || isNaN(seconds)) return '0:00';
@@ -39,12 +40,6 @@ function formatTime(seconds: number) {
 // playing AND not buffering. That keeps it honest for streamed
 // tracks (startup delay, stalls, seeks that need a re-fetch)
 // without reading the player's position.
-//
-// stateRef holds:
-//   trackId        - used to detect track changes
-//   baseSeconds    - seconds accumulated before the current segment
-//   segmentStart   - wall-clock time the current segment started
-//   wasPlaying     - previous "effectively playing" value, to detect flips
 type PositionState = {
   trackId: string | undefined;
   baseSeconds: number;
@@ -69,13 +64,32 @@ export default function PlayerScreen() {
   } = usePlayer();
   const { colors, design } = useTheme();
 
+  // ── Responsive ─────────────────────────────────────────
+  // Compact: phone portrait — unchanged from before.
+  // Medium:  phone landscape / small tablet — bigger art, roomier
+  //          transport row.
+  // Wide:    tablet landscape / desktop browser — art caps out,
+  //          whole player centers in a max-width column.
+  const { width, height } = useWindowDimensions();
+  const isCompact = width < 500;
+  const isMedium = width >= 500 && width < 900;
+  const isWide = width >= 900;
+
+  // Cap art by both width and height so tall-but-narrow windows
+  // don't push the controls off-screen.
+  const artSize = useMemo(() => {
+    if (isCompact) return Math.min(width - 64, 340);
+    if (isMedium) return Math.min(width - 160, 400, height * 0.45);
+    return Math.min(440, height * 0.5);
+  }, [isCompact, isMedium, width, height]);
+
+  const hPad = isWide ? 32 : 24;
+  const scrollMaxWidth = isWide ? CONTENT_MAX_WIDTH : width;
+
   const [seeking, setSeeking] = useState(false);
   const [scrubPosition, setScrubPosition] = useState(0);
   const [displaySecond, setDisplaySecond] = useState(0);
 
-  // Audio is only really advancing when it is playing and not waiting
-  // for data. Local files are never buffering, so for them this is
-  // identical to isPlaying.
   const effectivePlaying = isPlaying && !isBuffering;
 
   const stateRef = useRef<PositionState>({
@@ -86,15 +100,10 @@ export default function PlayerScreen() {
   });
 
   // ── Anchor management ──────────────────────────────────
-  // Runs on track change and play/pause/buffering flip. Handles:
-  //   - New track → reset base to 0
-  //   - Resume    → start a new segment at current wall time
-  //   - Pause or buffering → accumulate elapsed time into base
   useEffect(() => {
     const s = stateRef.current;
     const now = Date.now();
 
-    // Track changed → full reset
     if (currentTrack?.id !== s.trackId) {
       s.trackId = currentTrack?.id;
       s.baseSeconds = 0;
@@ -104,13 +113,10 @@ export default function PlayerScreen() {
       return;
     }
 
-    // Play/pause/buffering flip
     if (effectivePlaying !== s.wasPlaying) {
       if (effectivePlaying) {
-        // Just resumed → new segment begins now
         s.segmentStart = now;
       } else {
-        // Just paused or started buffering → accumulate elapsed time
         s.baseSeconds += (now - s.segmentStart) / 1000;
       }
       s.wasPlaying = effectivePlaying;
@@ -118,8 +124,6 @@ export default function PlayerScreen() {
   }, [currentTrack?.id, effectivePlaying]);
 
   // ── Wall-clock ticker ──────────────────────────────────
-  // Runs only while audio is advancing and not scrubbing. Derives the
-  // display second from wall-clock elapsed time, never from the player.
   useEffect(() => {
     if (!effectivePlaying || seeking) return;
 
@@ -161,7 +165,7 @@ export default function PlayerScreen() {
       edges={['top', 'bottom']}
     >
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingHorizontal: isWide ? 24 : 16 }]}>
         <Pressable onPress={handleClose} hitSlop={10} style={styles.headerBtn}>
           <Feather name="chevron-down" size={26} color={colors.icon} />
         </Pressable>
@@ -194,7 +198,15 @@ export default function PlayerScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingHorizontal: hPad,
+            maxWidth: scrollMaxWidth,
+            alignSelf: isWide ? 'center' : 'stretch',
+            width: '100%',
+          },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {/* Album art + waveform */}
@@ -203,6 +215,8 @@ export default function PlayerScreen() {
             style={[
               styles.art,
               {
+                width: artSize,
+                height: artSize,
                 backgroundColor: colors.artPlaceholder,
                 borderRadius: design.radius.card + 6,
               },
@@ -291,7 +305,15 @@ export default function PlayerScreen() {
         </View>
 
         {/* Transport controls */}
-        <View style={styles.controls}>
+        <View
+          style={[
+            styles.controls,
+            {
+              paddingHorizontal: isWide ? 32 : 8,
+              gap: isWide ? 24 : 0,
+            },
+          ]}
+        >
           <Pressable
             onPress={toggleShuffle}
             hitSlop={10}
@@ -380,7 +402,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
     paddingVertical: 8,
   },
   headerBtn: {
@@ -391,7 +412,6 @@ const styles = StyleSheet.create({
   },
 
   scrollContent: {
-    paddingHorizontal: 24,
     paddingTop: 12,
     paddingBottom: 32,
   },
@@ -402,8 +422,6 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   art: {
-    width: ART_SIZE,
-    height: ART_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -414,7 +432,11 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   artImage: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   waveWrap: {
     position: 'absolute',
@@ -444,7 +466,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 20,
     marginBottom: 32,
-    paddingHorizontal: 8,
   },
   smallBtn: {
     width: 44,
