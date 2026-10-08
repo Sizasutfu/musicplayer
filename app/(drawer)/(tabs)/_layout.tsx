@@ -1,5 +1,6 @@
 // app/(drawer)/(tabs)/_layout.tsx
-import { Tabs, useNavigation } from 'expo-router';
+import React, { useEffect, useRef } from 'react';
+import { Tabs, useNavigation, usePathname, useRouter } from 'expo-router';
 import {
   StyleSheet,
   Platform,
@@ -10,17 +11,90 @@ import {
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { DrawerActions } from 'expo-router/react-navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../../context/ThemeContext';
 import NowPlayingAside from '../../../components/NowPlayingAside';
 
-// Matches the drawer's breakpoint. When the drawer is permanent,
-// the tabs' hamburger hides.
+// Matches the breakpoints used elsewhere in the app.
 const PERMANENT_DRAWER_BREAKPOINT = 900;
-
-// The now-playing aside needs room. With the drawer permanent at
-// 280px and the aside at 320px, this breakpoint ensures at least
-// ~600px of content between them.
 const ASIDE_BREAKPOINT = 1200;
+
+// ── Last-tab persistence ────────────────────────────────
+// Stored as the URL form (`/library`, `/playlists`, etc.) so it
+// survives route-tree refactors that change file locations but
+// keep the URLs stable.
+const LAST_TAB_KEY = 'nav:lastTab:v1';
+
+// Only these paths are persisted. `/favorites` is reachable via
+// the home screen heart but isn't a tab, so restoring to it would
+// be confusing — the user would land on a screen with no tab
+// highlighted.
+const PERSISTED_TABS = ['/', '/library', '/playlists', '/settings'];
+
+// Guards against re-restoring after the tabs layout re-mounts
+// during the same session — which happens every time the user
+// visits a drawer peer (Circle, Albums, Artists, Profile) and
+// comes back. Only a full JS reload (cold start) resets it.
+let restoredThisSession = false;
+
+/**
+ * Restores the last open tab once per app launch, then keeps the
+ * saved value up to date as the user navigates between tabs.
+ *
+ * Skipped on web: the browser URL is the source of truth there,
+ * and the bottom tab bar is hidden anyway.
+ */
+function usePersistLastTab() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const hydrated = useRef(false);
+
+  // Restore once per session.
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      hydrated.current = true;
+      return;
+    }
+
+    if (restoredThisSession) {
+      // Tabs layout re-mounted mid-session — don't re-restore.
+      // Still mark hydrated so the persist effect can run below.
+      hydrated.current = true;
+      return;
+    }
+    restoredThisSession = true;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const last = await AsyncStorage.getItem(LAST_TAB_KEY);
+        if (cancelled) return;
+        if (last && PERSISTED_TABS.includes(last) && pathname !== last) {
+          router.replace(last as any);
+        }
+      } catch {
+        // ignore — fall through to the default tab
+      } finally {
+        if (!cancelled) hydrated.current = true;
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist whenever the active tab changes. Gated on `hydrated`
+  // so the initial pathname (which is `/` before the restore
+  // resolves) doesn't overwrite the saved value.
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    if (!hydrated.current) return;
+    if (!PERSISTED_TABS.includes(pathname)) return;
+    AsyncStorage.setItem(LAST_TAB_KEY, pathname).catch(() => {});
+  }, [pathname]);
+}
 
 function MenuButton() {
   const navigation = useNavigation<any>();
@@ -47,6 +121,8 @@ export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
 
+  usePersistLastTab();
+
   const isWeb = Platform.OS === 'web';
   const drawerPermanent = isWeb && width >= PERMANENT_DRAWER_BREAKPOINT;
   const showAside = isWeb && width >= ASIDE_BREAKPOINT;
@@ -66,7 +142,6 @@ export default function TabsLayout() {
             headerTitleStyle: { fontWeight: '700', color: colors.text },
             headerTintColor: colors.text,
             headerShadowVisible: false,
-            // Redundant when the drawer is already on screen.
             headerLeft: drawerPermanent
               ? () => null
               : () => <MenuButton />,
@@ -143,6 +218,9 @@ export default function TabsLayout() {
               ),
             }}
           />
+          {/* Route exists but is hidden from the tab bar. Reachable
+              via the home screen heart button. Not persisted — it
+              isn't a tab. */}
           <Tabs.Screen
             name="favorites"
             options={{
@@ -157,8 +235,6 @@ export default function TabsLayout() {
 }
 
 const styles = StyleSheet.create({
-  // row-reverse puts the second child (the aside) on the right
-  // without moving any JSX around.
   root: { flex: 1, flexDirection: 'row-reverse' },
   tabsWrap: { flex: 1 },
   menuBtn: { paddingHorizontal: 12, paddingVertical: 8, marginLeft: 4 },
