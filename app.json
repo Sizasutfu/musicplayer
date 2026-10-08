@@ -8,6 +8,7 @@
     "scheme": "musicplayer",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "jsEngine": "hermes",
     "ios": {
       "bundleIdentifier": "com.sizacode.MusicPlayer",
       "supportsTablet": true,
@@ -73,7 +74,17 @@
         }
       ],
       "expo-asset",
-      "expo-build-properties",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "buildArchs": ["arm64-v8a"],
+            "enableProguardInReleaseBuilds": true
+          }
+        }
+      ],
       "expo-font"
     ],
     "experiments": {
